@@ -1,38 +1,34 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
 import 'pages/home_page.dart';
 import 'pages/workout_page.dart';
 import 'pages/camera_page.dart';
 import 'pages/profile_page.dart';
 
-void main() {
-  runApp(const GymRVTApp());
-}
+void main() => runApp(const MyApp());
 
-class GymRVTApp extends StatelessWidget {
-  const GymRVTApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'gymrvt',
       debugShowCheckedModeBanner: false,
-      title: 'GYMRVT',
-      theme: ThemeData.dark(useMaterial3: true).copyWith(
-        scaffoldBackgroundColor: const Color(0xFF101010),
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.orange),
-      ),
-      home: const NavigationRoot(),
+      theme: ThemeData.dark(),
+      home: const MainPage(),
     );
   }
 }
 
-class NavigationRoot extends StatefulWidget {
-  const NavigationRoot({super.key});
+class MainPage extends StatefulWidget {
+  const MainPage({super.key});
 
   @override
-  State<NavigationRoot> createState() => _NavigationRootState();
+  State<MainPage> createState() => _MainPageState();
 }
 
-class _NavigationRootState extends State<NavigationRoot> {
+class _MainPageState extends State<MainPage> {
   int _selectedIndex = 0;
 
   final List<Widget> _pages = const [
@@ -55,9 +51,10 @@ class _NavigationRootState extends State<NavigationRoot> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
-        backgroundColor: const Color(0xFF101010),
         selectedItemColor: Colors.orange,
-        unselectedItemColor: Colors.white54,
+        unselectedItemColor: Colors.grey[400],
+        backgroundColor: const Color(0xFF181818),
+        type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(icon: Icon(Icons.fitness_center), label: 'Workout'),
