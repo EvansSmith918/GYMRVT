@@ -13,6 +13,8 @@ dependencies:
   cupertino_icons: ^1.0.8
   camera: ^0.10.5+7
   google_mlkit_pose_detection: ^0.8.0
+  health: ^13.1.1
+  permission_handler: ^11.3.0
 
 dev_dependencies:
   flutter_test:
