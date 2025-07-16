@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
+// lib/pages/camera_page.dart
 import 'package:camera/camera.dart';
-import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:flutter/material.dart';
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -10,56 +10,57 @@ class CameraPage extends StatefulWidget {
 }
 
 class _CameraPageState extends State<CameraPage> {
-  CameraController? _cameraController;
-  bool _isInitialized = false;
-  final PoseDetector _poseDetector =
-      PoseDetector(options: PoseDetectorOptions());
+  CameraController? _controller;
+  Future<void>? _initializeControllerFuture;
 
   @override
   void initState() {
     super.initState();
-    _initializeCamera();
+    _setupCamera();
   }
 
-  Future<void> _initializeCamera() async {
+  Future<void> _setupCamera() async {
     final cameras = await availableCameras();
-    final frontCam = cameras.firstWhere(
-        (cam) => cam.lensDirection == CameraLensDirection.front,
-        orElse: () => cameras.first);
-
-    _cameraController = CameraController(
-      frontCam,
-      ResolutionPreset.medium,
-      enableAudio: false,
+    final frontCamera = cameras.firstWhere(
+      (cam) => cam.lensDirection == CameraLensDirection.front,
+      orElse: () => cameras.first,
     );
 
-    await _cameraController!.initialize();
+    _controller = CameraController(frontCamera, ResolutionPreset.medium);
+    _initializeControllerFuture = _controller!.initialize();
 
-    if (!mounted) return;
-
-    setState(() => _isInitialized = true);
-    _cameraController!.startImageStream(_processCameraImage);
-  }
-
-  void _processCameraImage(CameraImage image) async {
-    // TODO: Add real-time pose detection processing here.
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override
   void dispose() {
-    _cameraController?.dispose();
-    _poseDetector.close();
+    _controller?.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(title: const Text("GYMRVT Camera")),
-      body: _isInitialized && _cameraController != null
-          ? CameraPreview(_cameraController!)
-          : const Center(child: CircularProgressIndicator()),
+      backgroundColor: const Color(0xFF101010),
+      appBar: AppBar(
+        title: const Text('Camera'),
+        backgroundColor: const Color(0xFF101010),
+      ),
+      body: _controller == null
+          ? const Center(child: CircularProgressIndicator())
+          : FutureBuilder(
+              future: _initializeControllerFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.done) {
+                  return CameraPreview(_controller!);
+                } else {
+                  return const Center(child: CircularProgressIndicator());
+                }
+              },
+            ),
     );
   }
 }
+
