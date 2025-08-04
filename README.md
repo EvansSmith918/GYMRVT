@@ -11,6 +11,8 @@
 - Offline workout logging with exportable data
 - Audio feedback to announce reps and performance
 - 100% privacy-focused: all processing is local on the device
+- will also connect to Phone Health Apps
+  
 
 ## How It Works
 
