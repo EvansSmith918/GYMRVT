@@ -14,6 +14,8 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   String? _userName;
   File? _profileImage;
+  int _todayReps = 0;
+  bool _isHealthConnected = false;
 
   @override
   void initState() {
@@ -23,14 +25,17 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _loadProfileData() async {
     final prefs = await SharedPreferences.getInstance();
-    String? name = prefs.getString('name');
-    String? imagePath = prefs.getString('profileImage');
-
     setState(() {
-      _userName = name;
+      _userName = prefs.getString('name');
+      _isHealthConnected = prefs.getBool('health_connected') ?? false;
+
+      String? imagePath = prefs.getString('profileImage');
       if (imagePath != null && File(imagePath).existsSync()) {
         _profileImage = File(imagePath);
       }
+
+      // You can later replace this with actual logic to pull from SQLite or Health
+      _todayReps = prefs.getInt('reps_today') ?? 0;
     });
   }
 
@@ -57,7 +62,7 @@ class _HomePageState extends State<HomePage> {
                     ),
                   const SizedBox(width: 12),
                   Text(
-                    'Welcome Back, $_userName',
+                    'Welcome Back, $_userName 👋',
                     style: const TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
@@ -67,42 +72,9 @@ class _HomePageState extends State<HomePage> {
               ),
             if (_userName != null) const SizedBox(height: 20),
 
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.orange,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'We have a new challenge!',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Text(
-                        '200 Steps',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Icon(Icons.directions_walk, color: Colors.white, size: 36),
-                ],
-              ),
-            ),
+            _buildRepsCard(_todayReps, healthConnected: _isHealthConnected),
             const SizedBox(height: 24),
+
             const Text(
               'Recommended Workouts',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
@@ -113,6 +85,60 @@ class _HomePageState extends State<HomePage> {
             _buildWorkoutItem('Back', '10 Tutorials • 45 min'),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildRepsCard(int reps, {bool healthConnected = false}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.orange.shade400, Colors.deepOrange],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                healthConnected ? 'Synced from Health App' : 'Tracked Locally',
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Reps Today',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '$reps Reps',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+          Icon(
+            healthConnected ? Icons.verified_user : Icons.fitness_center,
+            color: Colors.white,
+            size: 40,
+          ),
+        ],
       ),
     );
   }
