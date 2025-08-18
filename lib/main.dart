@@ -1,11 +1,19 @@
-// lib/main.dart
 import 'package:flutter/material.dart';
+
 import 'pages/home_page.dart';
 import 'pages/workout_page.dart';
 import 'pages/camera_page.dart';
 import 'pages/profile_page.dart';
 
-void main() => runApp(const MyApp());
+import 'package:gymrvt/services/notification_service.dart';
+import 'package:gymrvt/services/goal_service.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NotificationService().init();
+  await GoalService.ensureScheduledReminderAtLaunch();
+  runApp(const MyApp());
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});

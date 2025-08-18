@@ -1,10 +1,10 @@
-// lib/pages/profile_page.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart';
+import 'package:path/path.dart' as p;            //  alias to avoid Context name clash
+import 'package:gymrvt/pages/appearance_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -30,7 +30,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _loadProfile() async {
     final prefs = await SharedPreferences.getInstance();
-    if (!mounted) return; // safety before setState
+    if (!mounted) return;
     setState(() {
       _nameController.text = prefs.getString('name') ?? '';
       _ageController.text = prefs.getString('age') ?? '';
@@ -54,13 +54,12 @@ class _ProfilePageState extends State<ProfilePage> {
     await prefs.setString('height_feet', _heightFeetController.text);
     await prefs.setString('height_inches', _heightInchesController.text);
     await prefs.setString('gender', _gender);
-
     if (_profileImage != null) {
       await prefs.setString('profileImage', _profileImage!.path);
     }
 
-    if (!mounted) return; //  guard context after awaits
-    ScaffoldMessenger.of(context as BuildContext).showSnackBar(
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Profile saved!')),
     );
   }
@@ -68,14 +67,11 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _pickImage() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery);
-
     if (picked != null) {
       final appDir = await getApplicationDocumentsDirectory();
-      final fileName = basename(picked.path);
-      final savedImage =
-          await File(picked.path).copy('${appDir.path}/$fileName');
-
-      if (!mounted) return; // safety before setState
+      final fileName = p.basename(picked.path);              //  use alias
+      final savedImage = await File(picked.path).copy('${appDir.path}/$fileName');
+      if (!mounted) return;
       setState(() {
         _profileImage = savedImage;
       });
@@ -83,7 +79,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _connectToHealthApps() {
-    ScaffoldMessenger.of(context as BuildContext).showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Connecting to health app...')),
     );
   }
@@ -91,10 +87,22 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF101010),
+      backgroundColor: Colors.transparent,                    // let custom bg show
       appBar: AppBar(
         title: const Text('Profile'),
-        backgroundColor: const Color(0xFF101010),
+        backgroundColor: Colors.transparent,                  // let custom bg show
+        elevation: 0,
+        actions: [
+          IconButton(
+            tooltip: 'Customize Background',
+            icon: const Icon(Icons.wallpaper_outlined),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const AppearancePage()),
+              );
+            },
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -132,6 +140,20 @@ class _ProfilePageState extends State<ProfilePage> {
                 side: const BorderSide(color: Colors.white),
               ),
             ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const AppearancePage()),
+                );
+              },
+              icon: const Icon(Icons.wallpaper, color: Colors.white),
+              label: const Text('Customize Background'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: Colors.white,
+                side: const BorderSide(color: Colors.white),
+              ),
+            ),
           ],
         ),
       ),
@@ -150,7 +172,7 @@ class _ProfilePageState extends State<ProfilePage> {
           labelText: label,
           labelStyle: const TextStyle(color: Colors.grey),
           filled: true,
-          fillColor: Colors.grey.shade900,
+          fillColor: Colors.black.withValues(alpha: 0.6),     //  replace withOpacity
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         ),
       ),
@@ -171,9 +193,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 labelText: "Height (ft)",
                 labelStyle: const TextStyle(color: Colors.grey),
                 filled: true,
-                fillColor: Colors.grey.shade900,
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                fillColor: Colors.black.withValues(alpha: 0.6), // 
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
           ),
@@ -187,9 +208,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 labelText: "Height (in)",
                 labelStyle: const TextStyle(color: Colors.grey),
                 filled: true,
-                fillColor: Colors.grey.shade900,
-                border:
-                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                fillColor: Colors.black.withValues(alpha: 0.6), // 
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
           ),
@@ -203,13 +223,13 @@ class _ProfilePageState extends State<ProfilePage> {
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: DropdownButtonFormField<String>(
         value: _gender,
-        dropdownColor: Colors.grey.shade900,
+        dropdownColor: Colors.black87,
         style: const TextStyle(color: Colors.white),
         decoration: InputDecoration(
           labelText: 'Gender',
           labelStyle: const TextStyle(color: Colors.grey),
           filled: true,
-          fillColor: Colors.grey.shade900,
+          fillColor: Colors.black.withValues(alpha: 0.6),     // 
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         ),
         items: ['Male', 'Female', 'Other'].map((String gender) {

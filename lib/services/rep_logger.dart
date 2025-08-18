@@ -32,6 +32,20 @@ class RepLogger {
     await prefs.setString(_storeKey, jsonEncode(data));
   }
 
+  /// Overwrite the exact reps total for a specific day.
+  /// Use this after editing/deleting sets so the weekly chart stays accurate.
+  Future<void> setRepsForDate({required DateTime date, required int reps}) async {
+    final prefs = await _prefs;
+    final raw = prefs.getString(_storeKey);
+    final Map<String, dynamic> data =
+        raw == null ? {} : (jsonDecode(raw) as Map<String, dynamic>);
+
+    final key = _ymd(date);
+    data[key] = reps;
+
+    await prefs.setString(_storeKey, jsonEncode(data));
+  }
+
   /// Returns the last 7 days (today inclusive), filling missing days with 0
   Future<List<DailyReps>> getRepsLast7Days() async {
     final prefs = await _prefs;
