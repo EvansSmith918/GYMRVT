@@ -1,3 +1,4 @@
+// ignore_for_file: use_build_context_synchronously
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -24,7 +25,6 @@ class WorkoutPage extends StatefulWidget {
 }
 
 class _WorkoutPageState extends State<WorkoutPage> {
-  // format helpers
   String _fmtWeight(double display) =>
       '${display == display.truncateToDouble() ? display.toInt() : display.toStringAsFixed(1)} ${_unit == WeightUnit.lb ? 'lb' : 'kg'}';
   String _fmtLoad(double v, NumberFormat fmt) => '${fmt.format(v.round())} lb';
@@ -37,15 +37,12 @@ class _WorkoutPageState extends State<WorkoutPage> {
   DailyWorkout? _day;
   bool _loading = true;
 
-  // prefs
   WeightUnit _unit = WeightUnit.lb;
   int _restDefault = 90;
 
-  // rest timer
   Timer? _restTimer;
   int _restRemaining = 0;
 
-  // suggestions from templates (weights stored in lb)
   Map<String, double> _suggestedLb = const {};
 
   @override
@@ -57,8 +54,12 @@ class _WorkoutPageState extends State<WorkoutPage> {
   @override
   void dispose() {
     _newExerciseCtl.dispose();
-    for (final c in _repsCtl.values) { c.dispose(); }
-    for (final c in _weightCtl.values) { c.dispose(); }
+    for (final c in _repsCtl.values) {
+      c.dispose();
+    }
+    for (final c in _weightCtl.values) {
+      c.dispose();
+    }
     _restTimer?.cancel();
     super.dispose();
   }
@@ -80,7 +81,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
       _loading = false;
     });
 
-    // PR cache
     _prByName.clear();
     for (final ex in d.exercises) {
       final best = await WorkoutStats.bestOneRm(ex.name);
@@ -88,7 +88,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
       _prByName[ex.name] = best;
     }
 
-    // seed controllers (+ template suggestions)
     for (final ex in d.exercises) {
       _repsCtl[ex.id] ??= TextEditingController(text: '10');
       final suggLb = _suggestedLb[ex.name];
@@ -110,15 +109,18 @@ class _WorkoutPageState extends State<WorkoutPage> {
     await RepLogger().setRepsForDate(date: _today, reps: _day!.totalReps);
   }
 
-  // rest timer
   void _startRestTimer(int seconds) {
     _restTimer?.cancel();
     setState(() => _restRemaining = seconds);
     _restTimer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) { t.cancel(); return; }
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
       if (_restRemaining <= 1) {
         t.cancel();
         setState(() => _restRemaining = 0);
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('✅ Rest done — next set ready!')),
         );
@@ -128,14 +130,16 @@ class _WorkoutPageState extends State<WorkoutPage> {
     });
   }
 
-  void _cancelRestTimer() { _restTimer?.cancel(); setState(() => _restRemaining = 0); }
+  void _cancelRestTimer() {
+    _restTimer?.cancel();
+    setState(() => _restRemaining = 0);
+  }
+
   void _add30s() => setState(() => _restRemaining += 30);
 
-  // actions
   Future<void> _addExercise({String? presetName}) async {
     String name = presetName ?? _newExerciseCtl.text.trim();
     if (name.isEmpty) {
-      // pick from library if blank
       final picked = await Navigator.of(context).push<String>(
         MaterialPageRoute(builder: (_) => const ExerciseLibraryPage()),
       );
@@ -173,10 +177,16 @@ class _WorkoutPageState extends State<WorkoutPage> {
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Rename exercise'),
-        content: TextField(controller: controller, decoration: const InputDecoration(labelText: 'Name')),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(labelText: 'Name'),
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          ElevatedButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: const Text('Save')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('Save'),
+          ),
         ],
       ),
     );
@@ -205,10 +215,13 @@ class _WorkoutPageState extends State<WorkoutPage> {
   }
 
   Future<void> _addSet(ExerciseEntry ex) async {
-    final reps = int.tryParse((_repsCtl[ex.id] ?? TextEditingController(text: '10')).text.trim());
-    final display = double.tryParse((_weightCtl[ex.id] ?? TextEditingController(text: '0')).text.trim());
+    final reps = int.tryParse(
+        (_repsCtl[ex.id] ?? TextEditingController(text: '10')).text.trim());
+    final display = double.tryParse(
+        (_weightCtl[ex.id] ?? TextEditingController(text: '0')).text.trim());
     if (reps == null || reps <= 0 || display == null || display < 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter valid reps/weight.')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Enter valid reps/weight.')));
       return;
     }
     final weightLb = UserPrefs.fromDisplay(display, _unit);
@@ -234,7 +247,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
 
   Future<void> _duplicateLastSet(ExerciseEntry ex) async {
     if (ex.sets.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No previous set.')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('No previous set.')));
       return;
     }
     final last = ex.sets.last;
@@ -249,22 +263,34 @@ class _WorkoutPageState extends State<WorkoutPage> {
     final repsCtl = TextEditingController(text: s.reps.toString());
     final disp = UserPrefs.toDisplay(s.weight, _unit);
     final weightCtl = TextEditingController(
-      text: disp == disp.truncateToDouble() ? disp.toInt().toString() : disp.toStringAsFixed(1),
+      text: disp == disp.truncateToDouble()
+          ? disp.toInt().toString()
+          : disp.toStringAsFixed(1),
     );
 
     final result = await showDialog<Map<String, num>?>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Edit set'),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          TextField(controller: repsCtl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Reps')),
-          const SizedBox(height: 8),
-          TextField(
-            controller: weightCtl,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(labelText: 'Weight (${_unit == WeightUnit.lb ? 'lb' : 'kg'})'),
-          ),
-        ]),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: repsCtl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Reps'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: weightCtl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                labelText: 'Weight (${_unit == WeightUnit.lb ? 'lb' : 'kg'})',
+              ),
+            ),
+          ],
+        ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
@@ -285,7 +311,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
     if (result == null) return;
 
     final newLb = UserPrefs.fromDisplay(result['disp']!.toDouble(), _unit);
-    final d = await WorkoutStore().updateSet(_today, ex.id, s.id, reps: result['reps']!.toInt(), weight: newLb);
+    final d = await WorkoutStore()
+        .updateSet(_today, ex.id, s.id, reps: result['reps']!.toInt(), weight: newLb);
     if (!mounted) return;
     setState(() => _day = d);
     await _syncWeeklyChart();
@@ -311,8 +338,12 @@ class _WorkoutPageState extends State<WorkoutPage> {
     if (!mounted) return;
     setState(() {
       _day = DailyWorkout.empty(_today);
-      for (final c in _repsCtl.values) { c.dispose(); }
-      for (final c in _weightCtl.values) { c.dispose(); }
+      for (final c in _repsCtl.values) {
+        c.dispose();
+      }
+      for (final c in _weightCtl.values) {
+        c.dispose();
+      }
       _repsCtl.clear();
       _weightCtl.clear();
       _prByName.clear();
@@ -321,25 +352,32 @@ class _WorkoutPageState extends State<WorkoutPage> {
     await _syncWeeklyChart();
   }
 
-  // ---- Plate Calculator ----
   Future<void> _showPlatesFor(ExerciseEntry ex) async {
-    final wc = _weightCtl[ex.id] ?? TextEditingController(text: _unit == WeightUnit.lb ? '135' : '60');
+    final wc = _weightCtl[ex.id] ??
+        TextEditingController(text: _unit == WeightUnit.lb ? '135' : '60');
     final display = double.tryParse(wc.text.trim());
     if (display == null || display <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Enter a target weight first.')));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('Enter a target weight first.')));
       return;
     }
     final bar = await UserPrefs.barWeight(_unit);
-    final b = await PlateMath.compute(targetDisplay: display, unit: _unit, barDisplay: bar);
+    final b = await PlateMath.compute(
+      targetDisplay: display,
+      unit: _unit,
+      barDisplay: bar,
+    );
 
     String sideText() {
       if (!b.possible && b.target < b.bar) return 'Target is below the bar.';
       if (b.perSide.isEmpty && b.remainder == 0) return 'No plates needed — just the bar.';
       final sizes = b.perSide.keys.toList()..sort((a, c) => c.compareTo(a));
-      final parts = sizes.map((s) => '${s == s.truncateToDouble() ? s.toInt() : s} × ${b.perSide[s]}').toList();
+      final parts =
+          sizes.map((s) => '${s == s.truncateToDouble() ? s.toInt() : s} × ${b.perSide[s]}').toList();
       var txt = parts.join('  •  ');
       if (b.remainder != 0) {
-        txt += '  (leftover ${b.remainder.toStringAsFixed(2)} ${_unit == WeightUnit.lb ? 'lb' : 'kg'} per side)';
+        txt +=
+            '  (leftover ${b.remainder.toStringAsFixed(2)} ${_unit == WeightUnit.lb ? 'lb' : 'kg'} per side)';
       }
       return txt;
     }
@@ -379,35 +417,49 @@ class _WorkoutPageState extends State<WorkoutPage> {
           IconButton(
             tooltip: 'Templates',
             icon: const Icon(Icons.assignment_outlined),
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const ProgramTemplatesPage())),
+            onPressed: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const ProgramTemplatesPage())),
           ),
           IconButton(
             tooltip: 'Library',
             icon: const Icon(Icons.library_books_outlined),
             onPressed: () async {
-              final picked = await Navigator.of(context).push<String>(MaterialPageRoute(builder: (_) => const ExerciseLibraryPage()));
+              final picked = await Navigator.of(context)
+                  .push<String>(MaterialPageRoute(builder: (_) => const ExerciseLibraryPage()));
               if (picked != null) _addExercise(presetName: picked);
             },
           ),
           IconButton(
             tooltip: 'Insights',
             icon: const Icon(Icons.insights_outlined),
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-              builder: (_) => ExerciseInsightsPage(initialExercise: _day?.exercises.isNotEmpty == true ? _day!.exercises.first.name : null),
-            )),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ExerciseInsightsPage(
+                  initialExercise:
+                      _day?.exercises.isNotEmpty == true ? _day!.exercises.first.name : null,
+                ),
+              ),
+            ),
           ),
           IconButton(
             tooltip: 'History',
             icon: const Icon(Icons.history),
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const WorkoutHistoryPage())),
+            onPressed: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const WorkoutHistoryPage())),
           ),
           IconButton(
             tooltip: 'Settings',
             icon: const Icon(Icons.settings),
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const SettingsPage())).then((_) => _load()),
+            onPressed: () => Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const SettingsPage()))
+                .then((_) => _load()),
           ),
           if (day != null && day.exercises.isNotEmpty)
-            IconButton(tooltip: 'Clear today', icon: const Icon(Icons.delete_outline), onPressed: _clearDay),
+            IconButton(
+              tooltip: 'Clear today',
+              icon: const Icon(Icons.delete_outline),
+              onPressed: _clearDay,
+            ),
         ],
       ),
       body: Stack(
@@ -420,10 +472,8 @@ class _WorkoutPageState extends State<WorkoutPage> {
               children: [
                 _header(day, numFmt),
                 const SizedBox(height: 8),
-                // NEW: streak + weekly goal header
                 const StreakGoalHeader(),
                 const SizedBox(height: 12),
-
                 _addExerciseRow(),
                 const SizedBox(height: 12),
                 ...day.exercises.map((ex) => _exerciseCard(ex, numFmt)),
@@ -431,32 +481,40 @@ class _WorkoutPageState extends State<WorkoutPage> {
                   Card(
                     child: Padding(
                       padding: const EdgeInsets.all(16),
-                      child: Text('No exercises yet today. Add your first one!',
-                          style: Theme.of(context).textTheme.bodyMedium),
+                      child: Text(
+                        'No exercises yet today. Add your first one!',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
                     ),
                   ),
               ],
             ),
-
           if (_restRemaining > 0)
             Positioned(
-              left: 16, right: 16, bottom: 16,
+              left: 16,
+              right: 16,
+              bottom: 16,
               child: Card(
                 elevation: 6,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Row(children: [
-                        const Icon(Icons.timer_outlined), const SizedBox(width: 8),
-                        Text('Rest: ${_restRemaining ~/ 60}:${(_restRemaining % 60).toString().padLeft(2, '0')}',
-                            style: const TextStyle(fontWeight: FontWeight.w600)),
+                        const Icon(Icons.timer_outlined),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Rest: ${_restRemaining ~/ 60}:${(_restRemaining % 60).toString().padLeft(2, '0')}',
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
                       ]),
                       Row(children: [
                         TextButton(onPressed: _add30s, child: const Text('+30s')),
                         const SizedBox(width: 8),
-                        TextButton(onPressed: _cancelRestTimer, child: const Text('Cancel')),
+                        TextButton(
+                            onPressed: _cancelRestTimer, child: const Text('Cancel')),
                       ]),
                     ],
                   ),
@@ -473,9 +531,12 @@ class _WorkoutPageState extends State<WorkoutPage> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(children: [
-          const Icon(Icons.summarize), const SizedBox(width: 10),
-          Text('Total load today: ${day.totalReps} reps • ${_fmtLoad(day.totalVolume, fmt)} • ${day.exercises.length} exercises',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          const Icon(Icons.summarize),
+          const SizedBox(width: 10),
+          Text(
+            'Total load today: ${day.totalReps} reps • ${_fmtLoad(day.totalVolume, fmt)} • ${day.exercises.length} exercises',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
         ]),
       ),
     );
@@ -506,103 +567,144 @@ class _WorkoutPageState extends State<WorkoutPage> {
             label: const Text('Library'),
           ),
           const SizedBox(width: 8),
-          ElevatedButton.icon(onPressed: _addExercise, icon: const Icon(Icons.add), label: const Text('Add')),
+          ElevatedButton.icon(
+            onPressed: _addExercise,
+            icon: const Icon(Icons.add),
+            label: const Text('Add'),
+          ),
         ]),
       ),
     );
   }
 
   Widget _exerciseCard(ExerciseEntry ex, NumberFormat fmt) {
-    final repsCtl = _repsCtl[ex.id] ??= TextEditingController(text: '10');
-    final weightCtl = _weightCtl[ex.id] ??= TextEditingController(text: _unit == WeightUnit.lb ? '135' : '60');
+    final repsCtl =
+        _repsCtl[ex.id] ??= TextEditingController(text: '10');
+    final weightCtl =
+        _weightCtl[ex.id] ??= TextEditingController(text: _unit == WeightUnit.lb ? '135' : '60');
     final timeFmt = DateFormat('h:mm a');
 
-    final maxWlb = ex.sets.fold<double>(0, (m, s) => s.weight > m ? s.weight : m);
+    final maxWlb =
+        ex.sets.fold<double>(0, (m, s) => s.weight > m ? s.weight : m);
     final maxWdisp = UserPrefs.toDisplay(maxWlb, _unit);
     final pr = _prByName[ex.name];
-    final prText = (pr != null && pr > 0) ? ' • PR ${fmt.format(pr.round())} lb' : '';
-    final topSetText = maxWlb > 0 ? ' • top set ${_fmtWeight(maxWdisp)}' : '';
+    final prText =
+        (pr != null && pr > 0) ? ' • PR ${fmt.format(pr.round())} lb' : '';
+    final topSetText =
+        maxWlb > 0 ? ' • top set ${_fmtWeight(maxWdisp)}' : '';
 
     final weightChips = UserPrefs.weightChips(_unit);
 
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(12),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          ListTile(
-            dense: true,
-            contentPadding: EdgeInsets.zero,
-            title: Text(ex.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: Text('${ex.totalReps} reps • ${_fmtLoad(ex.totalVolume, fmt)}$topSetText$prText'),
-            trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-              IconButton(tooltip: 'Rename', icon: const Icon(Icons.edit_outlined), onPressed: () => _renameExercise(ex)),
-              IconButton(tooltip: 'Delete exercise', icon: const Icon(Icons.delete_outline), onPressed: () => _deleteExercise(ex)),
-            ]),
-          ),
-          const SizedBox(height: 8),
-          Row(children: [
-            SizedBox(
-              width: 90,
-              child: TextField(
-                controller: repsCtl,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(labelText: 'Reps', border: OutlineInputBorder()),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(ex.name,
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+              subtitle: Text(
+                  '${ex.totalReps} reps • ${_fmtLoad(ex.totalVolume, fmt)}$topSetText$prText'),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                      tooltip: 'Rename',
+                      icon: const Icon(Icons.edit_outlined),
+                      onPressed: () => _renameExercise(ex)),
+                  IconButton(
+                      tooltip: 'Delete exercise',
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () => _deleteExercise(ex)),
+                ],
               ),
             ),
-            const SizedBox(width: 8),
-            SizedBox(
-              width: 130,
-              child: TextField(
-                controller: weightCtl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  labelText: 'Weight (${_unit == WeightUnit.lb ? 'lb' : 'kg'})',
-                  border: const OutlineInputBorder(),
+            const SizedBox(height: 8),
+            Row(children: [
+              SizedBox(
+                width: 90,
+                child: TextField(
+                  controller: repsCtl,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Reps',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            ElevatedButton.icon(onPressed: () => _addSet(ex), icon: const Icon(Icons.add_task), label: const Text('Add set')),
-            const SizedBox(width: 8),
-            OutlinedButton.icon(onPressed: () => _duplicateLastSet(ex), icon: const Icon(Icons.copy), label: const Text('Duplicate')),
-            const SizedBox(width: 8),
-            IconButton(
-              tooltip: 'Plate breakdown',
-              icon: const Icon(Icons.fitness_center),
-              onPressed: () => _showPlatesFor(ex),
-            ),
-          ]),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 6,
-            children: [5, 8, 10, 12, 15]
-                .map((v) => ActionChip(label: Text('$v'), onPressed: () => setState(() => repsCtl.text = '$v')))
-                .toList(),
-          ),
-          const SizedBox(height: 6),
-          Wrap(
-            spacing: 6,
-            children: weightChips
-                .map((w) => ActionChip(label: Text(_fmtWeight(w)), onPressed: () => setState(() => weightCtl.text = w.toString())))
-                .toList(),
-          ),
-          const SizedBox(height: 8),
-          if (ex.sets.isNotEmpty)
+              const SizedBox(width: 8),
+              SizedBox(
+                width: 130,
+                child: TextField(
+                  controller: weightCtl,
+                  keyboardType:
+                      const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: 'Weight (${_unit == WeightUnit.lb ? 'lb' : 'kg'})',
+                    border: const OutlineInputBorder(),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: () => _addSet(ex),
+                icon: const Icon(Icons.add_task),
+                label: const Text('Add set'),
+              ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                onPressed: () => _duplicateLastSet(ex),
+                icon: const Icon(Icons.copy),
+                label: const Text('Duplicate'),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'Plate breakdown',
+                icon: const Icon(Icons.fitness_center),
+                onPressed: () => _showPlatesFor(ex),
+              ),
+            ]),
+            const SizedBox(height: 8),
             Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: ex.sets.map((s) {
-                final timeLabel = timeFmt.format(s.time);
-                final disp = UserPrefs.toDisplay(s.weight, _unit);
-                return InputChip(
-                  label: Text('${s.reps}×${_fmtWeight(disp)} • $timeLabel'),
-                  onPressed: () => _editSet(ex, s),
-                  deleteIcon: const Icon(Icons.close),
-                  onDeleted: () => _deleteSet(ex, s),
-                );
-              }).toList(),
+              spacing: 6,
+              children: [5, 8, 10, 12, 15]
+                  .map((v) => ActionChip(
+                        label: Text('$v'),
+                        onPressed: () => setState(() => repsCtl.text = '$v'),
+                      ))
+                  .toList(),
             ),
-        ]),
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              children: weightChips
+                  .map((w) => ActionChip(
+                        label: Text(_fmtWeight(w)),
+                        onPressed: () => setState(() => weightCtl.text = w.toString()),
+                      ))
+                  .toList(),
+            ),
+            const SizedBox(height: 8),
+            if (ex.sets.isNotEmpty)
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: ex.sets.map((s) {
+                  final timeLabel = timeFmt.format(s.time);
+                  final disp = UserPrefs.toDisplay(s.weight, _unit);
+                  return InputChip(
+                    label: Text('${s.reps}×${_fmtWeight(disp)} • $timeLabel'),
+                    onPressed: () => _editSet(ex, s),
+                    deleteIcon: const Icon(Icons.close),
+                    onDeleted: () => _deleteSet(ex, s),
+                  );
+                }).toList(),
+              ),
+          ],
+        ),
       ),
     );
   }

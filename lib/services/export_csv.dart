@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'dart:io';
+
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:cross_file/cross_file.dart';
 
 import 'package:gymrvt/services/workout_store.dart';
 import 'package:gymrvt/services/user_prefs.dart';
@@ -53,7 +53,7 @@ class ExportCsv {
     try {
       await Share.shareXFiles([XFile(path)], text: 'GymRVT export');
     } catch (_) {
-      // If share isn’t supported, the file is still saved at [path]
+      // If share isn’t supported, the file is still saved at [path].
     }
     return path;
   }
@@ -61,7 +61,7 @@ class ExportCsv {
   static String _csv(String s) {
     final t = s.replaceAll('"', '""');
     return '"$t"';
-    }
+  }
 
   static String _num(num n) =>
       n.toStringAsFixed(n == n.roundToDouble() ? 0 : 2);
