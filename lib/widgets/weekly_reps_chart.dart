@@ -11,7 +11,8 @@ class WeeklyRepsChart extends StatefulWidget {
 }
 
 class _WeeklyRepsChartState extends State<WeeklyRepsChart> {
-  Map<String, int> _weeklyReps = {};
+  List<DailyReps> _weeklyReps = const [];
+  bool _loading = true;
 
   @override
   void initState() {
@@ -21,74 +22,84 @@ class _WeeklyRepsChartState extends State<WeeklyRepsChart> {
 
   Future<void> _loadWeeklyData() async {
     final reps = await RepLogger().getRepsLast7Days();
+    if (!mounted) return; // fixes "use_build_context_synchronously" lint
     setState(() {
       _weeklyReps = reps;
+      _loading = false;
     });
   }
 
   @override
   Widget build(BuildContext context) {
-    final days = _weeklyReps.keys.toList().reversed.toList(); // Oldest to newest
-    final values = days.map((d) => _weeklyReps[d]!.toDouble()).toList();
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_weeklyReps.isEmpty) {
+      return const Text('No reps logged this week yet.');
+    }
+
+    final spots = <BarChartGroupData>[];
+    final df = DateFormat('E'); // Mon, Tue, ...
+
+    for (int i = 0; i < _weeklyReps.length; i++) {
+      final day = _weeklyReps[i];
+      spots.add(
+        BarChartGroupData(
+          x: i,
+          barRods: [BarChartRodData(toY: day.reps.toDouble())],
+          showingTooltipIndicators: [0],
+        ),
+      );
+    }
 
     return Card(
-      color: Colors.black,
       elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Reps (Last 7 Days)',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
-            ),
-            const SizedBox(height: 12),
+            const Text('Weekly Reps', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
             SizedBox(
-              height: 180,
+              height: 220,
               child: BarChart(
                 BarChartData(
+                  barGroups: spots,
+                  gridData: const FlGridData(show: true),
                   borderData: FlBorderData(show: false),
-                  gridData: FlGridData(show: false),
                   titlesData: FlTitlesData(
+                    leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 32)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
                     bottomTitles: AxisTitles(
                       sideTitles: SideTitles(
                         showTitles: true,
                         getTitlesWidget: (value, meta) {
-                          final index = value.toInt();
-                          if (index < 0 || index >= days.length) return const SizedBox.shrink();
-                          final date = DateTime.parse(days[index]);
-                          return Text(
-                            DateFormat.E().format(date),
-                            style: const TextStyle(color: Colors.white, fontSize: 10),
+                          final idx = value.toInt();
+                          if (idx < 0 || idx >= _weeklyReps.length) return const SizedBox.shrink();
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(df.format(_weeklyReps[idx].date), style: const TextStyle(fontSize: 10)),
                           );
                         },
                       ),
                     ),
-                    leftTitles: AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    rightTitles: AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
-                    ),
-                    topTitles: AxisTitles(
-                      sideTitles: SideTitles(showTitles: false),
+                  ),
+                  barTouchData: BarTouchData(
+                    enabled: true,
+                    touchTooltipData: BarTouchTooltipData(
+                      getTooltipItem: (group, groupIndex, rod, rodIndex) {
+                        final d = _weeklyReps[group.x.toInt()];
+                        return BarTooltipItem(
+                          '${DateFormat('EEE, MMM d').format(d.date)}\n${d.reps} reps',
+                          const TextStyle(fontWeight: FontWeight.w600),
+                        );
+                      },
                     ),
                   ),
-                  barGroups: List.generate(days.length, (i) {
-                    return BarChartGroupData(
-                      x: i,
-                      barRods: [
-                        BarChartRodData(
-                          toY: values[i],
-                          width: 14,
-                          borderRadius: BorderRadius.circular(6),
-                          color: Colors.orangeAccent,
-                        )
-                      ],
-                    );
-                  }),
                 ),
               ),
             ),
@@ -98,3 +109,4 @@ class _WeeklyRepsChartState extends State<WeeklyRepsChart> {
     );
   }
 }
+

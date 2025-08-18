@@ -1,5 +1,4 @@
 // lib/pages/profile_page.dart
-
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
@@ -31,6 +30,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<void> _loadProfile() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return; // safety before setState
     setState(() {
       _nameController.text = prefs.getString('name') ?? '';
       _ageController.text = prefs.getString('age') ?? '';
@@ -39,7 +39,7 @@ class _ProfilePageState extends State<ProfilePage> {
       _heightInchesController.text = prefs.getString('height_inches') ?? '';
       _gender = prefs.getString('gender') ?? 'Male';
 
-      String? imagePath = prefs.getString('profileImage');
+      final imagePath = prefs.getString('profileImage');
       if (imagePath != null && File(imagePath).existsSync()) {
         _profileImage = File(imagePath);
       }
@@ -59,7 +59,8 @@ class _ProfilePageState extends State<ProfilePage> {
       await prefs.setString('profileImage', _profileImage!.path);
     }
 
-    ScaffoldMessenger.of(this.context).showSnackBar(
+    if (!mounted) return; //  guard context after awaits
+    ScaffoldMessenger.of(context as BuildContext).showSnackBar(
       const SnackBar(content: Text('Profile saved!')),
     );
   }
@@ -71,8 +72,10 @@ class _ProfilePageState extends State<ProfilePage> {
     if (picked != null) {
       final appDir = await getApplicationDocumentsDirectory();
       final fileName = basename(picked.path);
-      final savedImage = await File(picked.path).copy('${appDir.path}/$fileName');
+      final savedImage =
+          await File(picked.path).copy('${appDir.path}/$fileName');
 
+      if (!mounted) return; // safety before setState
       setState(() {
         _profileImage = savedImage;
       });
@@ -80,7 +83,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _connectToHealthApps() {
-    ScaffoldMessenger.of(this.context).showSnackBar(
+    ScaffoldMessenger.of(context as BuildContext).showSnackBar(
       const SnackBar(content: Text('Connecting to health app...')),
     );
   }
@@ -103,7 +106,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 radius: 50,
                 backgroundImage: _profileImage != null
                     ? FileImage(_profileImage!)
-                    : const AssetImage('assets/avatar_placeholder.png') as ImageProvider,
+                    : const AssetImage('assets/avatar_placeholder.png')
+                        as ImageProvider,
               ),
             ),
             const SizedBox(height: 16),
@@ -115,9 +119,7 @@ class _ProfilePageState extends State<ProfilePage> {
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: _saveProfile,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
               child: const Text('Save Profile'),
             ),
             const SizedBox(height: 12),
@@ -136,7 +138,8 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller, {bool isNumber = false}) {
+  Widget _buildTextField(String label, TextEditingController controller,
+      {bool isNumber = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: TextField(
@@ -169,7 +172,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 labelStyle: const TextStyle(color: Colors.grey),
                 filled: true,
                 fillColor: Colors.grey.shade900,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
           ),
@@ -184,7 +188,8 @@ class _ProfilePageState extends State<ProfilePage> {
                 labelStyle: const TextStyle(color: Colors.grey),
                 filled: true,
                 fillColor: Colors.grey.shade900,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               ),
             ),
           ),
