@@ -1,0 +1,46 @@
+<!--?xml version="1.0" encoding="UTF-8"?-->
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <!-- subtle shadow -->
+  <ellipse cx="512" cy="742" rx="260" ry="44" fill="#000000" opacity="0.16"></ellipse>
+
+  <!-- cap -->
+  <rect x="356" y="178" width="312" height="90" rx="24" fill="#1E1E1E"></rect>
+  <rect x="374" y="192" width="276" height="18" rx="9" fill="#FFFFFF" opacity="0.12"></rect>
+
+  <!-- neck -->
+  <rect x="430" y="268" width="168" height="42" rx="10" fill="#2C2C2C"></rect>
+
+  <!-- glass body -->
+  <rect x="292" y="306" width="440" height="480" rx="56" fill="#FFFFFF"></rect>
+  <rect x="304" y="318" width="416" height="456" rx="48" fill="#FFFFFF" stroke="#E6E6E6" stroke-width="8"></rect>
+
+  <!-- liquid (brand blue) -->
+  <rect x="316" y="524" width="392" height="236" rx="40" fill="#38BDF8"></rect>
+  <path d="M316 524 C402 504, 618 504, 708 524 L708 560 L316 560 Z" fill="#5CD0FF" opacity="0.9"></path>
+
+  <!-- label band -->
+  <rect x="316" y="436" width="392" height="112" rx="24" fill="#0E0E0E"></rect>
+  <rect id="labelArea" x="330" y="448" width="364" height="88" rx="20" fill="#FFFFFF"></rect>
+
+  <!-- clip path to prevent any text/lines bleed -->
+  <defs>
+    <clipPath id="labelClip">
+      <rect x="330" y="448" width="364" height="88" rx="20"></rect>
+    </clipPath>
+  </defs>
+
+  <!-- GYMRVT + decorative lines (clipped inside label) -->
+  <g clip-path="url(#labelClip)">
+    <!-- brand text -->
+    <text x="512" y="508" text-anchor="middle" font-family="Inter, Roboto, Arial" font-size="72" font-weight="900" fill="#0E0E0E" letter-spacing="2">GYMRVT</text>
+
+    <!-- twin blue lines centered under the text -->
+    <!-- positions: both inside the 364×88 label; adjust width/spacing if you want thicker/thinner -->
+    <rect x="458" y="526" width="44" height="6" rx="3" fill="#38BDF8"></rect>
+    <rect x="522" y="526" width="44" height="6" rx="3" fill="#38BDF8"></rect>
+  </g>
+
+  <!-- glass highlight -->
+  <path d="M340 334 C340 334, 464 322, 684 342 C684 342, 688 366, 680 382
+           C580 374, 472 378, 354 398 C344 380, 340 356, 340 334 Z" fill="#FFFFFF" opacity="0.38"></path>
+</svg>
