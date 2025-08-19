@@ -11,29 +11,40 @@ dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
+
+  # Camera / media
   camera: ^0.10.5+7
-  google_mlkit_pose_detection: ^0.8.0
-  health: ^13.1.1
-  permission_handler: ^11.3.0
-  shared_preferences: ^2.2.2
   image_picker: ^1.1.0
   path_provider: ^2.1.2
   path: ^1.9.0
+  cross_file: ^0.3.4+2
+  share_plus: ^10.0.2
+
+  # ML Kit (updated)
+  google_mlkit_pose_detection: ^0.10.0
+
+  # Health / notifications
+  health: ^13.1.1
+  flutter_local_notifications: ^17.2.2
+  timezone: ^0.9.2
+  permission_handler: ^11.3.0
+
+  # State / storage / UI
+  shared_preferences: ^2.2.2
   fl_chart: ^0.64.0
   intl: ^0.19.0
   flutter_colorpicker: ^1.0.3
-  share_plus: ^10.0.2
-  cross_file: ^0.3.4+2
-  flutter_local_notifications: ^17.2.2
-  timezone: ^0.9.2
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
 
+# Force a newer commons package so AGP 8+ has a namespace
+dependency_overrides:
+  google_mlkit_commons: ^0.7.0
+
 flutter:
   uses-material-design: true
-
   assets:
     - assets/avatar_placeholder.png
