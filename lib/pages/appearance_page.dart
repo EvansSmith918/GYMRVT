@@ -1,108 +1,130 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
+
 import 'package:gymrvt/services/appearance_prefs.dart';
+import 'package:gymrvt/widgets/app_background.dart';
 
 class AppearancePage extends StatefulWidget {
   const AppearancePage({super.key});
+
   @override
   State<AppearancePage> createState() => _AppearancePageState();
 }
 
 class _AppearancePageState extends State<AppearancePage> {
-  final controller = AppearanceController();
-  Color _temp = Colors.blueGrey;
+  final AppearancePrefs _prefs = AppearancePrefs();
 
-  @override
-  void initState() {
-    super.initState();
-    controller.load();
-  }
-
-  Future<void> _pickColor() async {
-    _temp = controller.model.color;
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Pick background color'),
+  Future<void> _pickBgColor() async {
+    Color tmp = _prefs.state.color;
+    final picked = await showDialog<Color?>(
+      context: this.context,
+      builder: (BuildContext ctx) => AlertDialog(
+        title: const Text('Background color'),
         content: SingleChildScrollView(
-          child: ColorPicker(
-            pickerColor: _temp,
-            onColorChanged: (c) => _temp = c,
-            enableAlpha: false,
-            displayThumbColor: true,
+          child: BlockPicker(
+            pickerColor: tmp,
+            onColorChanged: (c) => tmp = c,
           ),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           ElevatedButton(
-            onPressed: () async {
-              await controller.setColor(_temp);
-              if (ctx.mounted) Navigator.pop(ctx);     //  guard the dialog context, not State.context
-              setState(() {});                          // refresh preview if any
-            },
+            onPressed: () => Navigator.pop(ctx, tmp),
             child: const Text('Use color'),
           ),
         ],
       ),
     );
-  }
-
-  Future<void> _pickImage() async {
-    final x = await ImagePicker().pickImage(source: ImageSource.gallery);
-    if (x != null) {
-      await controller.setImagePath(x.path);
-      if (!mounted) return;
-      setState(() {});
+    if (picked != null) {
+      await _prefs.setColor(picked);
     }
   }
 
-  Future<void> _reset() async {
-    await controller.clearBackground();
-    if (!mounted) return;
-    setState(() {});
+  Future<void> _pickBgImage() async {
+    final picker = ImagePicker();
+    final x = await picker.pickImage(source: ImageSource.gallery);
+    if (x == null) return;
+
+    final dir = await getApplicationDocumentsDirectory();
+    final fname = 'bg_${DateTime.now().millisecondsSinceEpoch}${extension(x.path)}';
+    final saved = await File(x.path).copy('${dir.path}/$fname');
+    await _prefs.setImage(saved.path);
   }
 
   @override
   Widget build(BuildContext context) {
-    final m = controller.model;
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
+    return AppBackground(
+      child: Scaffold(
         backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text('Appearance'),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Card(
-            child: ListTile(
-              title: const Text('Background color'),
-              subtitle: Text('#${m.color.toARGB32().toRadixString(16).padLeft(8, '0').toUpperCase()}'),
-              trailing: Container(
-                width: 24, height: 24,
-                decoration: BoxDecoration(color: m.color, borderRadius: BorderRadius.circular(6)),
-              ),
-              onTap: _pickColor,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Card(
-            child: ListTile(
-              title: const Text('Background image'),
-              subtitle: Text(m.imagePath ?? 'None'),
-              trailing: const Icon(Icons.photo_library_outlined),
-              onTap: _pickImage,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: _reset,
-            icon: const Icon(Icons.restore),
-            label: const Text('Reset to default'),
-          ),
-        ],
+        appBar: AppBar(
+          title: const Text('Appearance'),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+        ),
+        body: AnimatedBuilder(
+          animation: _prefs,
+          builder: (BuildContext context, _) {
+            final s = _prefs.state;
+            return ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: s.color,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white24),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            s.type == BgType.color
+                                ? 'Using background color'
+                                : (s.imagePath != null ? 'Using background image' : 'No image set'),
+                          ),
+                        ),
+                        TextButton.icon(
+                          onPressed: _pickBgColor,
+                          icon: const Icon(Icons.palette),
+                          label: const Text('Color'),
+                        ),
+                        const SizedBox(width: 8),
+                        TextButton.icon(
+                          onPressed: _pickBgImage,
+                          icon: const Icon(Icons.image),
+                          label: const Text('Image'),
+                        ),
+                        const SizedBox(width: 8),
+                        if (s.type == BgType.image)
+                          TextButton(
+                            onPressed: _prefs.useColorMode,
+                            child: const Text('Use color'),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+                if (s.type == BgType.image && s.imagePath != null && File(s.imagePath!).existsSync())
+                  Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: Image.file(File(s.imagePath!), height: 160, fit: BoxFit.cover),
+                  ),
+              ],
+            );
+          },
+        ),
       ),
     );
   }

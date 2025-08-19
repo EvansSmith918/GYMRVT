@@ -4,81 +4,86 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 enum BgType { color, image }
 
-class AppearanceModel {
+class AppearanceState {
   final BgType type;
   final Color color;
-  final String? imagePath; // local file path from ImagePicker
+  final String? imagePath;
 
-  const AppearanceModel({
+  const AppearanceState({
     required this.type,
     required this.color,
     this.imagePath,
   });
 
-  AppearanceModel copyWith({BgType? type, Color? color, String? imagePath}) {
-    return AppearanceModel(
+  AppearanceState copyWith({BgType? type, Color? color, String? imagePath}) {
+    return AppearanceState(
       type: type ?? this.type,
       color: color ?? this.color,
-      imagePath: imagePath ?? this.imagePath,
-    );
-    }
-
-  Map<String, dynamic> toJson() => {
-        'type': type.name,
-        'color': color.toARGB32(),
-        'imagePath': imagePath,
-      };
-
-  factory AppearanceModel.fromJson(Map<String, dynamic> json) {
-    final t = json['type'] as String? ?? 'color';
-    return AppearanceModel(
-      type: t == 'image' ? BgType.image : BgType.color,
-      color: Color((json['color'] as int?) ?? const Color(0xFF101012).toARGB32()),
-      imagePath: json['imagePath'] as String?,
+      imagePath: imagePath,
     );
   }
 
-  static const AppearanceModel defaultTheme =
-      AppearanceModel(type: BgType.color, color: Color(0xFF101012));
+  Map<String, dynamic> toJson() => {
+        'type': type.name,
+        'color': color.value,
+        'imagePath': imagePath,
+      };
+
+  factory AppearanceState.fromJson(Map<String, dynamic> json) {
+    final t = (json['type'] as String?) ?? 'color';
+    return AppearanceState(
+      type: t == 'image' ? BgType.image : BgType.color,
+      color: Color((json['color'] as num?)?.toInt() ?? 0xFF101010),
+      imagePath: json['imagePath'] as String?,
+    );
+  }
 }
 
-class AppearanceController extends ChangeNotifier {
-  static const _key = 'appearance_prefs_v1';
-  AppearanceModel _model = AppearanceModel.defaultTheme;
-  AppearanceModel get model => _model;
+/// Singleton app-wide appearance controller (persists + notifies).
+class AppearancePrefs extends ChangeNotifier {
+  static const _key = 'appearance_v1';
 
-  AppearanceController._();
-  static final AppearanceController _i = AppearanceController._();
-  factory AppearanceController() => _i;
+  AppearancePrefs._internal() {
+    _load();
+  }
+  static final AppearancePrefs _instance = AppearancePrefs._internal();
+  factory AppearancePrefs() => _instance;
 
-  Future<void> load() async {
+  AppearanceState _state =
+      const AppearanceState(type: BgType.color, color: Color(0xFF101010));
+
+  AppearanceState get state => _state;
+
+  Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key);
     if (raw != null) {
-      _model = AppearanceModel.fromJson(jsonDecode(raw));
-      notifyListeners();
+      try {
+        _state = AppearanceState.fromJson(jsonDecode(raw) as Map<String, dynamic>);
+        notifyListeners();
+      } catch (_) {/* keep defaults */}
     }
   }
 
   Future<void> _save() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, jsonEncode(_model.toJson()));
+    await prefs.setString(_key, jsonEncode(_state.toJson()));
   }
 
-  Future<void> setColor(Color color) async {
-    _model = _model.copyWith(type: BgType.color, color: color, imagePath: null);
+  Future<void> setColor(Color c) async {
+    _state = _state.copyWith(type: BgType.color, color: c, imagePath: null);
     await _save();
     notifyListeners();
   }
 
-  Future<void> setImagePath(String path) async {
-    _model = _model.copyWith(type: BgType.image, imagePath: path);
+  Future<void> setImage(String path) async {
+    _state = _state.copyWith(type: BgType.image, imagePath: path);
     await _save();
     notifyListeners();
   }
 
-  Future<void> clearBackground() async {
-    _model = AppearanceModel.defaultTheme;
+  Future<void> useColorMode() async {
+    _state = _state.copyWith(type: BgType.color, imagePath: null);
     await _save();
     notifyListeners();
   }

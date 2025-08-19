@@ -1,10 +1,17 @@
+// lib/pages/profile_page.dart
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as p;            //  alias to avoid Context name clash
-import 'package:gymrvt/pages/appearance_page.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+ // Health package integration removed; update the 'health' dependency to re-enable HealthKit/Health Connect integration
+
+import 'package:gymrvt/services/appearance_prefs.dart';
+import 'package:gymrvt/services/weight_history.dart';
+import 'package:gymrvt/widgets/app_background.dart';
+import 'package:gymrvt/pages/profile_overview_page.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -19,13 +26,28 @@ class _ProfilePageState extends State<ProfilePage> {
   final TextEditingController _weightController = TextEditingController();
   final TextEditingController _heightFeetController = TextEditingController();
   final TextEditingController _heightInchesController = TextEditingController();
+
   String _gender = 'Male';
   File? _profileImage;
+
+  bool _healthConnected = false;
+
+  final AppearancePrefs _appearance = AppearancePrefs();
 
   @override
   void initState() {
     super.initState();
     _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _ageController.dispose();
+    _weightController.dispose();
+    _heightFeetController.dispose();
+    _heightInchesController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadProfile() async {
@@ -38,6 +60,7 @@ class _ProfilePageState extends State<ProfilePage> {
       _heightFeetController.text = prefs.getString('height_feet') ?? '';
       _heightInchesController.text = prefs.getString('height_inches') ?? '';
       _gender = prefs.getString('gender') ?? 'Male';
+      _healthConnected = prefs.getBool('health_connected') ?? false;
 
       final imagePath = prefs.getString('profileImage');
       if (imagePath != null && File(imagePath).existsSync()) {
@@ -46,203 +69,283 @@ class _ProfilePageState extends State<ProfilePage> {
     });
   }
 
-  Future<void> _saveProfile() async {
+  Future<void> _saveProfile(BuildContext bc) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('name', _nameController.text);
-    await prefs.setString('age', _ageController.text);
-    await prefs.setString('weight', _weightController.text);
-    await prefs.setString('height_feet', _heightFeetController.text);
-    await prefs.setString('height_inches', _heightInchesController.text);
+    await prefs.setString('name', _nameController.text.trim());
+    await prefs.setString('age', _ageController.text.trim());
+    await prefs.setString('weight', _weightController.text.trim());
+    await prefs.setString('height_feet', _heightFeetController.text.trim());
+    await prefs.setString('height_inches', _heightInchesController.text.trim());
     await prefs.setString('gender', _gender);
+    await prefs.setBool('profile_complete', true); // <-- mark as complete
+
     if (_profileImage != null) {
       await prefs.setString('profileImage', _profileImage!.path);
     }
 
+    final w = double.tryParse(_weightController.text.trim());
+    if (w != null && w > 0) {
+      await WeightHistory().upsertToday(w);
+    }
+
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profile saved!')),
+    // Replace current edit screen with the Overview
+    Navigator.of(bc).pushReplacement(
+      MaterialPageRoute(builder: (BuildContext _) => const ProfileOverviewPage()),
     );
   }
 
-  Future<void> _pickImage() async {
+  Future<void> _pickAvatar() async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: ImageSource.gallery);
-    if (picked != null) {
-      final appDir = await getApplicationDocumentsDirectory();
-      final fileName = p.basename(picked.path);              //  use alias
-      final savedImage = await File(picked.path).copy('${appDir.path}/$fileName');
-      if (!mounted) return;
-      setState(() {
-        _profileImage = savedImage;
-      });
+    if (picked == null) return;
+
+    final appDir = await getApplicationDocumentsDirectory();
+    final fileName = basename(picked.path);
+    final savedImage = await File(picked.path).copy('${appDir.path}/$fileName');
+
+    if (!mounted) return;
+    setState(() => _profileImage = savedImage);
+  }
+
+  Future<void> _pickBgColor(BuildContext bc) async {
+    Color tmp = _appearance.state.color;
+    final selected = await showDialog<Color?>(
+      context: bc,
+      builder: (BuildContext ctx) => AlertDialog(
+        title: const Text('Background color'),
+        content: SingleChildScrollView(
+          child: BlockPicker(
+            pickerColor: tmp,
+            onColorChanged: (c) => tmp = c,
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, tmp), child: const Text('Use color')),
+        ],
+      ),
+    );
+    if (selected != null) {
+      await _appearance.setColor(selected); // updates app instantly
     }
   }
 
-  void _connectToHealthApps() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Connecting to health app...')),
+  Future<void> _pickBgImage(BuildContext bc) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery);
+    if (picked == null) return;
+
+    final dir = await getApplicationDocumentsDirectory();
+    final fname = 'bg_${DateTime.now().millisecondsSinceEpoch}${extension(picked.path)}';
+    final saved = await File(picked.path).copy('${dir.path}/$fname');
+
+    await _appearance.setImage(saved.path); // updates app instantly
+  }
+
+  Future<void> _connectToHealthApps(BuildContext bc) async {
+    // Health integration is currently disabled because the HealthFactory symbol
+    // is not available in the installed 'health' package version.
+    // To re-enable, update the 'health' package and restore the original
+    // implementation that requests permissions and connects to the platform's
+    // health services.
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('health_connected', false);
+    if (!mounted) return;
+    setState(() => _healthConnected = false);
+
+    ScaffoldMessenger.of(bc).showSnackBar(
+      const SnackBar(
+        content: Text('Health integration unavailable: update health package to enable this feature.'),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.transparent,                    // let custom bg show
-      appBar: AppBar(
-        title: const Text('Profile'),
-        backgroundColor: Colors.transparent,                  // let custom bg show
-        elevation: 0,
-        actions: [
-          IconButton(
-            tooltip: 'Customize Background',
-            icon: const Icon(Icons.wallpaper_outlined),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => const AppearancePage()),
-              );
-            },
-          ),
-        ],
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            GestureDetector(
-              onTap: _pickImage,
-              child: CircleAvatar(
-                radius: 50,
-                backgroundImage: _profileImage != null
-                    ? FileImage(_profileImage!)
-                    : const AssetImage('assets/avatar_placeholder.png')
-                        as ImageProvider,
+    return AppBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: const Text('Edit Profile'),
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+        ),
+        body: Builder(
+          builder: (BuildContext bc) {
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  GestureDetector(
+                    onTap: _pickAvatar,
+                    child: CircleAvatar(
+                      radius: 50,
+                      backgroundImage: _profileImage != null ? FileImage(_profileImage!) : null,
+                      child: _profileImage == null ? const Icon(Icons.person, size: 48) : null,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  _field('Name', _nameController),
+                  _field('Age', _ageController, isNumber: true),
+                  _field('Weight (lbs)', _weightController, isNumber: true),
+                  _heightRow(),
+                  _genderDropdown(),
+
+                  const SizedBox(height: 16),
+
+                  // Appearance card
+                  AnimatedBuilder(
+                    animation: _appearance,
+                    builder: (BuildContext _, __) {
+                      final s = _appearance.state;
+                      return Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Appearance',
+                                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                              const SizedBox(height: 8),
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 28,
+                                    height: 28,
+                                    decoration: BoxDecoration(
+                                      color: s.color,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: Colors.white24),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      s.type == BgType.color
+                                          ? 'Using background color'
+                                          : (s.imagePath != null
+                                              ? 'Using background image'
+                                              : 'No image set'),
+                                    ),
+                                  ),
+                                  TextButton.icon(
+                                    onPressed: () => _pickBgColor(bc),
+                                    icon: const Icon(Icons.palette),
+                                    label: const Text('Color'),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  TextButton.icon(
+                                    onPressed: () => _pickBgImage(bc),
+                                    icon: const Icon(Icons.image),
+                                    label: const Text('Image'),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  if (s.type == BgType.image)
+                                    TextButton(
+                                      onPressed: _appearance.useColorMode,
+                                      child: const Text('Use color'),
+                                    ),
+                                ],
+                              ),
+                              if (s.type == BgType.image && s.imagePath != null)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 8),
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.file(
+                                      File(s.imagePath!),
+                                      height: 80,
+                                      width: double.infinity,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Save + Connect actions
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () => _saveProfile(bc),
+                          child: const Text('Save Profile'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _connectToHealthApps(bc),
+                          icon: Icon(_healthConnected
+                              ? Icons.health_and_safety
+                              : Icons.health_and_safety_outlined),
+                          label: Text(_healthConnected
+                              ? 'Connected'
+                              : 'Connect to Health'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(height: 16),
-            _buildTextField('Name', _nameController),
-            _buildTextField('Age', _ageController, isNumber: true),
-            _buildTextField('Weight (lbs)', _weightController, isNumber: true),
-            _buildHeightInput(),
-            _buildGenderDropdown(),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: _saveProfile,
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-              child: const Text('Save Profile'),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: _connectToHealthApps,
-              icon: const Icon(Icons.health_and_safety, color: Colors.white),
-              label: const Text('Connect to Health Apps'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: const BorderSide(color: Colors.white),
-              ),
-            ),
-            const SizedBox(height: 12),
-            OutlinedButton.icon(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const AppearancePage()),
-                );
-              },
-              icon: const Icon(Icons.wallpaper, color: Colors.white),
-              label: const Text('Customize Background'),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: Colors.white,
-                side: const BorderSide(color: Colors.white),
-              ),
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildTextField(String label, TextEditingController controller,
-      {bool isNumber = false}) {
+  // ---- helpers ----
+  Widget _field(String label, TextEditingController c, {bool isNumber = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: TextField(
-        controller: controller,
-        style: const TextStyle(color: Colors.white),
+        controller: c,
         keyboardType: isNumber ? TextInputType.number : TextInputType.text,
         decoration: InputDecoration(
           labelText: label,
-          labelStyle: const TextStyle(color: Colors.grey),
           filled: true,
-          fillColor: Colors.black.withValues(alpha: 0.6),     //  replace withOpacity
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         ),
       ),
     );
   }
 
-  Widget _buildHeightInput() {
+  Widget _heightRow() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Row(
         children: [
-          Expanded(
-            child: TextField(
-              controller: _heightFeetController,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: "Height (ft)",
-                labelStyle: const TextStyle(color: Colors.grey),
-                filled: true,
-                fillColor: Colors.black.withValues(alpha: 0.6), // 
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
-          ),
+          Expanded(child: _field('Height (ft)', _heightFeetController, isNumber: true)),
           const SizedBox(width: 12),
-          Expanded(
-            child: TextField(
-              controller: _heightInchesController,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                labelText: "Height (in)",
-                labelStyle: const TextStyle(color: Colors.grey),
-                filled: true,
-                fillColor: Colors.black.withValues(alpha: 0.6), // 
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
-          ),
+          Expanded(child: _field('Height (in)', _heightInchesController, isNumber: true)),
         ],
       ),
     );
   }
 
-  Widget _buildGenderDropdown() {
+  Widget _genderDropdown() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: DropdownButtonFormField<String>(
         value: _gender,
-        dropdownColor: Colors.black87,
-        style: const TextStyle(color: Colors.white),
+        items: const ['Male', 'Female', 'Other']
+            .map((g) => DropdownMenuItem(value: g, child: Text(g)))
+            .toList(),
+        onChanged: (v) => setState(() => _gender = v ?? 'Male'),
         decoration: InputDecoration(
           labelText: 'Gender',
-          labelStyle: const TextStyle(color: Colors.grey),
           filled: true,
-          fillColor: Colors.black.withValues(alpha: 0.6),     // 
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
         ),
-        items: ['Male', 'Female', 'Other'].map((String gender) {
-          return DropdownMenuItem<String>(
-            value: gender,
-            child: Text(gender),
-          );
-        }).toList(),
-        onChanged: (String? newValue) {
-          setState(() {
-            _gender = newValue!;
-          });
-        },
       ),
     );
   }

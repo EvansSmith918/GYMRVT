@@ -2,61 +2,42 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:gymrvt/services/appearance_prefs.dart';
 
-/// Wraps the whole app (via MaterialApp.builder) or individual pages.
-class AppBackground extends StatefulWidget {
+/// Renders the globally selected background (color or image) behind [child].
+/// Rebuilds automatically when the user changes it in Profile.
+class AppBackground extends StatelessWidget {
   final Widget child;
   const AppBackground({super.key, required this.child});
 
   @override
-  State<AppBackground> createState() => _AppBackgroundState();
-}
-
-class _AppBackgroundState extends State<AppBackground> {
-  final controller = AppearanceController();
-
-  @override
-  void initState() {
-    super.initState();
-    // In case not loaded yet; safe to call multiple times.
-    controller.load();
-    controller.addListener(_onChange);
-  }
-
-  void _onChange() {
-    if (mounted) setState(() {});
-  }
-
-  @override
-  void dispose() {
-    controller.removeListener(_onChange);
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final m = controller.model;
+    final prefs = AppearancePrefs(); // singleton + ChangeNotifier
+    return AnimatedBuilder(
+      animation: prefs,
+      builder: (BuildContext _, __) {
+        final s = prefs.state;
 
-    DecorationImage? img;
-    if (m.type == BgType.image && m.imagePath != null && m.imagePath!.isNotEmpty) {
-      final file = File(m.imagePath!);
-      if (file.existsSync()) {
-        img = DecorationImage(
-          image: FileImage(file),
-          fit: BoxFit.cover,
+        Widget bg;
+        if (s.type == BgType.image && s.imagePath != null && File(s.imagePath!).existsSync()) {
+          bg = Container(
+            decoration: BoxDecoration(
+              image: DecorationImage(
+                image: FileImage(File(s.imagePath!)),
+                fit: BoxFit.cover,
+              ),
+            ),
+          );
+        } else {
+          bg = Container(color: s.color);
+        }
+
+        // Slight dark overlay for legibility on bright images/colors
+        final overlay = Container(color: Colors.black.withOpacity(0.12));
+
+        return Stack(
+          fit: StackFit.expand,
+          children: [bg, overlay, child],
         );
-      }
-    }
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: m.type == BgType.color ? m.color : Colors.black,
-        image: img,
-      ),
-      child: SafeArea(
-        top: false,
-        bottom: false,
-        child: widget.child,
-      ),
+      },
     );
   }
 }

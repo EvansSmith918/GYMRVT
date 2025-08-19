@@ -1,19 +1,12 @@
+// lib/main.dart
 import 'package:flutter/material.dart';
-
 import 'pages/home_page.dart';
 import 'pages/workout_page.dart';
 import 'pages/camera_page.dart';
-import 'pages/profile_page.dart';
+import 'pages/profile_root_page.dart'; // <-- NEW root router
+import 'widgets/app_background.dart';
 
-import 'package:gymrvt/services/notification_service.dart';
-import 'package:gymrvt/services/goal_service.dart';
-
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await NotificationService().init();
-  await GoalService.ensureScheduledReminderAtLaunch();
-  runApp(const MyApp());
-}
+void main() => runApp(const MyApp());
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -30,32 +23,38 @@ class MyApp extends StatelessWidget {
 }
 
 class MainPage extends StatefulWidget {
-  const MainPage({super.key});
+  const MainPage({super.key, this.initialIndex = 0});
+  final int initialIndex;
 
   @override
   State<MainPage> createState() => _MainPageState();
 }
 
 class _MainPageState extends State<MainPage> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
 
   final List<Widget> _pages = const [
     HomePage(),
     WorkoutPage(),
     CameraPage(),
-    ProfilePage(),
+    ProfileRoot(), // <-- instead of ProfilePage
   ];
 
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex =
+        (widget.initialIndex >= 0 && widget.initialIndex < _pages.length)
+            ? widget.initialIndex
+            : 0;
   }
+
+  void _onItemTapped(int index) => setState(() => _selectedIndex = index);
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: _pages[_selectedIndex],
+      body: AppBackground(child: _pages[_selectedIndex]),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,

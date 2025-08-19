@@ -6,7 +6,9 @@ plugins {
 }
 
 android {
-    namespace = "com.example.gymrvt"
+    // Make these match your manifest package
+    namespace = "com.evans.gymrvt"
+
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
 
@@ -20,25 +22,26 @@ android {
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.gymrvt"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // Make this match too
+        applicationId = "com.evans.gymrvt"
+
+        // Health Connect needs >= 26
+        minSdk = 26
         targetSdk = flutter.targetSdkVersion
+
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // TODO: add your own signing config for the release build.
+            // Using debug keys for now so `flutter run --release` works.
             signingConfig = signingConfigs.getByName("debug")
         }
     }
 }
 
 flutter {
-    source = "../.."
+    source = "../../.."
 }
