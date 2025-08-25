@@ -192,15 +192,24 @@ class _ProfileOverviewPageState extends State<ProfileOverviewPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Row(
+                          // ---- FIXED: header no longer overflows on small screens
+                          OverflowBar(
+                            alignment: MainAxisAlignment.spaceBetween,
+                            overflowAlignment: OverflowBarAlignment.end,
+                            spacing: 8,
                             children: [
-                              const Text('Weight trend (last 14 entries)',
-                                  style: TextStyle(fontWeight: FontWeight.w600)),
-                              const Spacer(),
+                              Expanded(
+                                child: Text(
+                                  'Weight trend (last 14 entries)',
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                              ),
                               TextButton.icon(
                                 onPressed: _addWeighIn,
-                                icon: const Icon(Icons.monitor_weight),
-                                label: const Text('Add weigh-in'),
+                                icon: const Icon(Icons.monitor_weight, size: 18),
+                                label: const Text('Add'),
                               ),
                             ],
                           ),

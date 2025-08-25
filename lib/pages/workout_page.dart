@@ -530,14 +530,24 @@ class _WorkoutPageState extends State<WorkoutPage> {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(children: [
-          const Icon(Icons.summarize),
-          const SizedBox(width: 10),
-          Text(
-            'Total load today: ${day.totalReps} reps • ${_fmtLoad(day.totalVolume, fmt)} • ${day.exercises.length} exercises',
-            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-        ]),
+        child: Row(
+          children: [
+            const Icon(Icons.summarize),
+            const SizedBox(width: 10),
+            Expanded( // <-- fixes tiny overflow on narrow phones
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Total load today: ${day.totalReps} reps • ${_fmtLoad(day.totalVolume, fmt)} • ${day.exercises.length} exercises',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -623,50 +633,52 @@ class _WorkoutPageState extends State<WorkoutPage> {
               ),
             ),
             const SizedBox(height: 8),
-            Row(children: [
-              SizedBox(
-                width: 90,
-                child: TextField(
-                  controller: repsCtl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Reps',
-                    border: OutlineInputBorder(),
+            // ---- FIXED: controls wrap on small screens (no 220px overflow)
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 90, maxWidth: 120),
+                  child: TextField(
+                    controller: repsCtl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Reps',
+                      border: OutlineInputBorder(),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 130,
-                child: TextField(
-                  controller: weightCtl,
-                  keyboardType:
-                      const TextInputType.numberWithOptions(decimal: true),
-                  decoration: InputDecoration(
-                    labelText: 'Weight (${_unit == WeightUnit.lb ? 'lb' : 'kg'})',
-                    border: const OutlineInputBorder(),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(minWidth: 120, maxWidth: 160),
+                  child: TextField(
+                    controller: weightCtl,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    decoration: InputDecoration(
+                      labelText: 'Weight (${_unit == WeightUnit.lb ? 'lb' : 'kg'})',
+                      border: const OutlineInputBorder(),
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton.icon(
-                onPressed: () => _addSet(ex),
-                icon: const Icon(Icons.add_task),
-                label: const Text('Add set'),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: () => _duplicateLastSet(ex),
-                icon: const Icon(Icons.copy),
-                label: const Text('Duplicate'),
-              ),
-              const SizedBox(width: 8),
-              IconButton(
-                tooltip: 'Plate breakdown',
-                icon: const Icon(Icons.fitness_center),
-                onPressed: () => _showPlatesFor(ex),
-              ),
-            ]),
+                ElevatedButton.icon(
+                  onPressed: () => _addSet(ex),
+                  icon: const Icon(Icons.add_task),
+                  label: const Text('Add set'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: () => _duplicateLastSet(ex),
+                  icon: const Icon(Icons.copy),
+                  label: const Text('Duplicate'),
+                ),
+                IconButton(
+                  tooltip: 'Plate breakdown',
+                  icon: const Icon(Icons.fitness_center),
+                  onPressed: () => _showPlatesFor(ex),
+                ),
+              ],
+            ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 6,

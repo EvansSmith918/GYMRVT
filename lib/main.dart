@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'pages/home_page.dart';
 import 'pages/workout_page.dart';
 import 'pages/camera_page.dart';
-import 'pages/profile_root_page.dart'; // <-- NEW root router
+import 'pages/profile_root_page.dart'; // <-- root for profile flow
 import 'widgets/app_background.dart';
 
 void main() => runApp(const MyApp());
@@ -17,6 +17,14 @@ class MyApp extends StatelessWidget {
       title: 'gymrvt',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(),
+      // Clamp extreme text scaling and ensure SafeArea for every page
+      builder: (context, child) {
+        final clamped = MediaQuery.of(context).textScaler.clamp(maxScaleFactor: 1.2);
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(textScaler: clamped),
+          child: SafeArea(top: true, bottom: true, child: child!),
+        );
+      },
       home: const MainPage(),
     );
   }
