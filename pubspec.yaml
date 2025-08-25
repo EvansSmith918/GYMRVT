@@ -40,6 +40,10 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^5.0.0
 
+  # --- Added for app icons & splash ---
+  flutter_launcher_icons: ^0.13.1
+  flutter_native_splash: ^2.4.0
+
 # Force a newer commons package so AGP 8+ has a namespace
 dependency_overrides:
   google_mlkit_commons: ^0.7.0
@@ -48,3 +52,19 @@ flutter:
   uses-material-design: true
   assets:
     - assets/avatar_placeholder.png
+    # Include your README logo folder (place app_icon.png here)
+    - assets/icon/
+
+# --- App icon config (uses assets/icon/app_icon.png) ---
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/icon/app_icon.png"
+
+# --- Splash screen config (same image, dark background) ---
+flutter_native_splash:
+  android: true
+  ios: true
+  web: false
+  color: "#181818"
+  image: assets/icon/app_icon.png
