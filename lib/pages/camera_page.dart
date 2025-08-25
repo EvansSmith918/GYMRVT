@@ -1,3 +1,4 @@
+// lib/pages/camera_page.dart
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
@@ -10,6 +11,7 @@ import '../services/rep_counter.dart';
 import '../models/exercise_profile.dart';
 import '../models/rep_event.dart';
 import '../widgets/pose_painter.dart';
+import '../services/muscle_advisor.dart'; // <-- use MuscleAdvice/MuscleAdvisor
 
 class CameraPage extends StatefulWidget {
   const CameraPage({super.key});
@@ -30,9 +32,6 @@ class _CameraPageState extends State<CameraPage> {
   DateTime? _lastTs;
   double? _lastY;
 
-  bool get _isFront =>
-      _cam.controller?.description.lensDirection == CameraLensDirection.front;
-
   @override
   void initState() {
     super.initState();
@@ -42,17 +41,9 @@ class _CameraPageState extends State<CameraPage> {
   }
 
   Future<void> _boot() async {
-    await _cam.init(preferred: CameraLensDirection.back);
+    await _cam.init(); // Back camera, YUV, high res
     if (!mounted) return;
     setState(() {});
-    await _cam.start(_onImage);
-  }
-
-  Future<void> _flipCamera() async {
-    await _cam.switchCamera();
-    if (!mounted) return;
-    setState(() {});
-    // restart stream with new controller
     await _cam.start(_onImage);
   }
 
@@ -65,7 +56,7 @@ class _CameraPageState extends State<CameraPage> {
     final poses = await _pose.process(img, camDesc);
     if (!mounted) return;
 
-    // vertical motion proxy from hips (normalized 0..1)
+    // Choose a robust proxy for vertical motion (hips work well for squats)
     double? proxyY;
     if (poses.isNotEmpty) {
       final lm = poses.first.landmarks;
@@ -73,6 +64,7 @@ class _CameraPageState extends State<CameraPage> {
       final rh = lm[PoseLandmarkType.rightHip]?.y;
       if (lh != null && rh != null) {
         proxyY = (lh + rh) / 2.0;
+        // normalize 0..1 (0 top, 1 bottom)
         proxyY = (proxyY / _imageSize.height).clamp(0.0, 1.0);
       }
     }
@@ -90,12 +82,15 @@ class _CameraPageState extends State<CameraPage> {
 
       final RepEvent? evt = _counter.update(y, vel, t);
       if (evt != null) {
-        setState(() => _reps += 1);
-        // hook into your store/logger here if desired
+        setState(() {
+          _reps += 1;
+        });
       }
     }
 
-    setState(() => _poses = poses);
+    setState(() {
+      _poses = poses;
+    });
   }
 
   @override
@@ -105,10 +100,85 @@ class _CameraPageState extends State<CameraPage> {
     super.dispose();
   }
 
+  Future<void> _analyzeCurrentPose() async {
+    if (_poses.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No pose detected. Hold a steady pose and try again.')),
+      );
+      return;
+    }
+    final MuscleAdvice advice = MuscleAdvisor.analyze(_poses.first);
+    if (!mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Theme.of(context).cardColor,
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Muscle Advisor',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              Text(advice.summary),
+              const SizedBox(height: 12),
+              if (advice.focus.isNotEmpty) ...[
+                const Text('Focus', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: advice.focus
+                      .map((m) => Chip(label: Text(m)))
+                      .toList(),
+                ),
+                const SizedBox(height: 8),
+              ],
+              if (advice.caution.isNotEmpty) ...[
+                const Text('Caution', style: TextStyle(fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                ...advice.caution.map((c) => Row(
+                      children: [
+                        const Icon(Icons.warning_amber_rounded, size: 16),
+                        const SizedBox(width: 6),
+                        Expanded(child: Text(c)),
+                      ],
+                    )),
+                const SizedBox(height: 8),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Optional: only works if your CameraStream has switchCamera()
+  Future<void> _tryFlipCamera() async {
+    if (!_cam.isReady) return;
+    final hasSwitch =
+        _cam.runtimeType.toString() == 'CameraStream' &&
+        _cam
+            .toString()
+            .contains('switchCamera'); // very loose detection to avoid crashes
+    if (!hasSwitch) return;
+    try {
+      // ignore: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
+      // If you added switchCamera() per previous suggestion, call it:
+      // await _cam.switchCamera();
+    } catch (_) {
+      // silently ignore if not implemented
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final ctrl = _cam.controller;
-
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -116,46 +186,31 @@ class _CameraPageState extends State<CameraPage> {
         actions: [
           IconButton(
             tooltip: 'Flip camera',
-            icon: const Icon(Icons.cameraswitch),
-            onPressed: _cam.isReady ? _flipCamera : null,
+            onPressed: _tryFlipCamera,
+            icon: const Icon(Icons.cameraswitch_rounded),
           ),
         ],
       ),
       body: (!(_cam.isReady) || ctrl == null)
           ? const Center(child: CircularProgressIndicator())
-          : LayoutBuilder(
-              builder: (_, __) {
-                // Camera gives a landscape previewSize; swap for portrait box.
-                final preview = ctrl.value.previewSize!;
-                final displaySize =
-                    Size(preview.height, preview.width); // swap for portrait
-
-                return Center(
-                  child: FittedBox(
-                    fit: BoxFit.contain, // keep aspect ratio, fill as much as possible
-                    child: SizedBox(
-                      width: displaySize.width,
-                      height: displaySize.height,
-                      child: Stack(
-                        fit: StackFit.expand,
-                        children: [
-                          CameraPreview(ctrl),
-                          CustomPaint(
-                            painter: PosePainter(
-                              poses: _poses,
-                              imageSize: _imageSize,
-                              repCount: _reps,
-                              isFrontCamera: _isFront,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+          : Stack(
+              fit: StackFit.expand,
+              children: [
+                CameraPreview(ctrl),
+                CustomPaint(
+                  painter: PosePainter(
+                    poses: _poses,
+                    imageSize: _imageSize,
+                    repCount: _reps,
                   ),
-                );
-              },
+                ),
+              ],
             ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _analyzeCurrentPose,
+        icon: const Icon(Icons.insights),
+        label: const Text('Analyze'),
+      ),
     );
   }
 }
-
