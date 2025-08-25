@@ -1,4 +1,4 @@
-package com.example.gymrvt
+package com.evans.gymrvt
 
 import io.flutter.embedding.android.FlutterActivity
 
