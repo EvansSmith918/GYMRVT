@@ -1,42 +1,33 @@
-// lib/pages/photo_advisor_page.dart
-import 'dart:async';
-import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
-
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
-import '../widgets/pose_painter.dart';
 import '../services/muscle_advisor.dart';
+import '../widgets/pose_painter.dart';
 
 class PhotoAdvisorPage extends StatefulWidget {
   const PhotoAdvisorPage({super.key});
+
   @override
   State<PhotoAdvisorPage> createState() => _PhotoAdvisorPageState();
 }
 
 class _PhotoAdvisorPageState extends State<PhotoAdvisorPage> {
-  final ImagePicker _picker = ImagePicker();
-  late final PoseDetector _detector;
-
-  File? _file;
-  Size? _imgSize;
+  Uint8List? _bytes;
+  Size _imageSize = Size.zero; // original pixel size
   List<Pose> _poses = const [];
   MuscleAdvice? _advice;
-  bool _busy = false;
+  bool _flipX = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _detector = PoseDetector(
-      options: PoseDetectorOptions(
-        mode: PoseDetectionMode.single,
-        model: PoseDetectionModel.base,
-      ),
-    );
-  }
+  final _picker = ImagePicker();
+  final PoseDetector _detector = PoseDetector(
+    options: PoseDetectorOptions(
+      mode: PoseDetectionMode.single,
+      model: PoseDetectionModel.base,
+    ),
+  );
 
   @override
   void dispose() {
@@ -44,184 +35,162 @@ class _PhotoAdvisorPageState extends State<PhotoAdvisorPage> {
     super.dispose();
   }
 
-  Future<ui.Image> _decode(Uint8List bytes) {
-    final c = Completer<ui.Image>();
-    ui.decodeImageFromList(bytes, (img) => c.complete(img));
-    return c.future;
+  Future<void> _pick() async {
+    final picked = await _picker.pickImage(source: ImageSource.gallery);
+    if (picked == null) return;
+
+    final bytes = await picked.readAsBytes();
+
+    // Determine original pixel size of the image buffer.
+    final codec = await ui.instantiateImageCodec(bytes);
+    final fi = await codec.getNextFrame();
+    final imgW = fi.image.width.toDouble();
+    final imgH = fi.image.height.toDouble();
+
+    // Run pose on the file path.
+    final input = InputImage.fromFilePath(picked.path);
+    final poses = await _detector.processImage(input);
+
+    // If analyze() uses named params, pass {pose: ...}
+    final MuscleAdvice? advice =
+        poses.isNotEmpty ? await Future.value(MuscleAdvisor.analyze(pose: poses.first)) : null;
+
+    if (!mounted) return;
+    setState(() {
+      _bytes = bytes;
+      _imageSize = Size(imgW, imgH);
+      _poses = poses;
+      _advice = advice;
+    });
   }
 
-  Future<void> _pickAndAnalyze() async {
-    final x = await _picker.pickImage(source: ImageSource.gallery);
-    if (x == null) return;
-
-    setState(() {
-      _busy = true;
-      _file = File(x.path);
-      _poses = const [];
-      _advice = null;
-      _imgSize = null;
-    });
-
-    try {
-      final bytes = await _file!.readAsBytes();
-      final uiImg = await _decode(bytes);
-      _imgSize = Size(uiImg.width.toDouble(), uiImg.height.toDouble());
-
-      // Try pose (optional)
-      final input = InputImage.fromFile(_file!);
-      final poses = await _detector.processImage(input);
-      _poses = poses;
-
-      // Advice driven by your **training history**; pose adds small posture notes.
-      _advice = await MuscleAdvisor.analyze(pose: poses.isNotEmpty ? poses.first : null);
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Analysis failed: $e')),
-      );
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+  /// Rectangle where the image is actually rendered with BoxFit.contain.
+  Rect _containedRect(Size canvas, Size source) {
+    if (canvas.isEmpty || source.isEmpty) return Rect.zero;
+    final sx = canvas.width / source.width;
+    final sy = canvas.height / source.height;
+    final scale = sx < sy ? sx : sy;
+    final w = source.width * scale;
+    final h = source.height * scale;
+    final dx = (canvas.width - w) / 2;
+    final dy = (canvas.height - h) / 2;
+    return Rect.fromLTWH(dx, dy, w, h);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('Photo Advisor'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
         actions: [
-          IconButton(
-            tooltip: 'Pick photo',
-            onPressed: _busy ? null : _pickAndAnalyze,
-            icon: const Icon(Icons.photo_library_outlined),
-          ),
+          if (_bytes != null)
+            IconButton(
+              tooltip: _flipX ? 'Unflip overlay' : 'Flip overlay',
+              onPressed: () => setState(() => _flipX = !_flipX),
+              icon: const Icon(Icons.flip),
+            ),
         ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _busy ? null : _pickAndAnalyze,
-        icon: const Icon(Icons.photo),
-        label: const Text('Choose Photo'),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (_file == null) _emptyHint() else _imageWithOverlay(),
-          const SizedBox(height: 12),
-          if (_busy) const LinearProgressIndicator(),
-          const SizedBox(height: 8),
-          _adviceCard(),
-          const SizedBox(height: 80),
-        ],
-      ),
-    );
-  }
+          AspectRatio(
+            aspectRatio: 3 / 4,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final canvasSize =
+                    Size(constraints.maxWidth, constraints.maxHeight);
+                final drawRect = _containedRect(canvasSize, _imageSize);
 
-  Widget _emptyHint() {
-    return Center(
-      child: Column(
-        children: [
-          const SizedBox(height: 40),
-          const Icon(Icons.photo_library, size: 56),
-          const SizedBox(height: 12),
-          const Text(
-            'Upload a full-body photo. We’ll use your recent training to suggest\n'
-            'which muscle groups likely need more work—and which may be fatigued.',
-            textAlign: TextAlign.center,
+                return Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Photo
+                    Container(
+                      color: const Color(0xFF1F1C23),
+                      child: _bytes == null
+                          ? const Center(child: Text('Choose a photo'))
+                          : FittedBox(
+                              fit: BoxFit.contain,
+                              child: Image.memory(_bytes!),
+                            ),
+                    ),
+                    // Overlay
+                    if (_bytes != null && _poses.isNotEmpty && !drawRect.isEmpty)
+                      CustomPaint(
+                        painter: PosePainter(
+                          poses: _poses,
+                          imageSize: _imageSize,
+                          drawRect: drawRect,
+                          flipX: _flipX,
+                        ),
+                        size: Size.infinite,
+                      ),
+                  ],
+                );
+              },
+            ),
           ),
           const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: _pickAndAnalyze,
-            icon: const Icon(Icons.photo),
-            label: const Text('Pick from gallery'),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.all(14),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Muscle Advisor',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+                  const SizedBox(height: 8),
+                  Text(
+                    _advice?.summary ??
+                        'Pick a clear, well-lit photo (front or back) Ai-advisor will give advice on certain groups.',
+                  ),
+                  if (_advice?.focus.isNotEmpty == true) ...[
+                    const SizedBox(height: 8),
+                    const Text('Focus',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: _advice!.focus
+                          .map((m) => Chip(label: Text(m)))
+                          .toList(),
+                    ),
+                  ],
+                  if (_advice?.caution.isNotEmpty == true) ...[
+                    const SizedBox(height: 8),
+                    const Text('Caution',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    ..._advice!.caution.map(
+                      (c) => Row(
+                        children: [
+                          const Icon(Icons.warning_amber_rounded, size: 16),
+                          const SizedBox(width: 6),
+                          Expanded(child: Text(c)),
+                        ],
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: ElevatedButton.icon(
+                      onPressed: _pick,
+                      icon: const Icon(Icons.image_outlined),
+                      label: const Text('Choose Photo'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _imageWithOverlay() {
-    final s = _imgSize;
-    if (s == null) return const SizedBox.shrink();
-    final ar = s.width / s.height;
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: AspectRatio(
-        aspectRatio: ar,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.file(_file!, fit: BoxFit.contain),
-            if (_poses.isNotEmpty)
-              CustomPaint(
-                painter: PosePainter(poses: _poses, imageSize: s, repCount: 0),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _adviceCard() {
-    final a = _advice;
-    if (_file == null) return const SizedBox.shrink();
-
-    if (a == null) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: const [
-              Icon(Icons.insights_outlined),
-              SizedBox(width: 12),
-              Expanded(child: Text('No advice yet. Pick a photo to analyze.')),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('Muscle Advisor',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            const SizedBox(height: 6),
-            Text(a.summary),
-            const SizedBox(height: 12),
-            if (a.focus.isNotEmpty) ...[
-              const Text('Needs more work', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 6),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: a.focus.map((g) => Chip(label: Text(g))).toList(),
-              ),
-              const SizedBox(height: 12),
-            ],
-            if (a.caution.isNotEmpty) ...[
-              const Text('Potentially fatigued', style: TextStyle(fontWeight: FontWeight.w600)),
-              const SizedBox(height: 6),
-              ...a.caution.map((c) => Padding(
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Padding(
-                          padding: EdgeInsets.only(top: 3),
-                          child: Icon(Icons.warning_amber_rounded, size: 16),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(child: Text(c)),
-                      ],
-                    ),
-                  )),
-            ],
-          ],
-        ),
       ),
     );
   }

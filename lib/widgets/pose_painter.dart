@@ -1,95 +1,108 @@
 import 'package:flutter/material.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
+/// Paints ML Kit pose landmarks/skeleton on top of an image rendered with
+/// BoxFit.contain inside [drawRect].
 class PosePainter extends CustomPainter {
   final List<Pose> poses;
-  final Size imageSize;      // Size from CameraImage (sensor coords)
-  final int repCount;
-  final bool isFrontCamera;  // <-- NEW: mirror overlay when using front cam
+  final Size imageSize; // original pixel size of the analyzed image
+  final Rect drawRect;  // where the image is shown on canvas
+  final bool flipX;
 
   PosePainter({
     required this.poses,
     required this.imageSize,
-    required this.repCount,
-    this.isFrontCamera = false,
+    required this.drawRect,
+    this.flipX = false,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    // In portrait, CameraImage is landscape (w,h) but preview is rotated 90°.
-    // Map (x,y) from image -> preview by SWAPPING axes and scaling.
-    // image:  (x across width, y across height)
-    // preview:(dx across width)  uses image y
-    //         (dy across height) uses image x
-    final scaleX = size.width / imageSize.height;
-    final scaleY = size.height / imageSize.width;
+    if (imageSize.width <= 0 || imageSize.height <= 0) return;
 
-    Offset _map(double x, double y) {
-      // swap axes
-      double dx = y * scaleX;
-      double dy = x * scaleY;
-
-      // mirror for front camera
-      if (isFrontCamera) dx = size.width - dx;
-      return Offset(dx, dy);
-    }
+    final sx = drawRect.width / imageSize.width;
+    final sy = drawRect.height / imageSize.height;
 
     final joint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 4
-      ..style = PaintingStyle.fill;
-
+      ..isAntiAlias = true
+      ..style = PaintingStyle.fill
+      ..color = Colors.white;
+    final jointShadow = Paint()
+      ..isAntiAlias = true
+      ..style = PaintingStyle.fill
+      ..color = Colors.black.withOpacity(.35);
     final bone = Paint()
-      ..color = Colors.white70
-      ..strokeWidth = 2;
+      ..isAntiAlias = true
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round
+      ..color = Colors.white.withOpacity(.95);
+    final boneShadow = Paint()
+      ..isAntiAlias = true
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5
+      ..strokeCap = StrokeCap.round
+      ..color = Colors.black.withOpacity(.35);
 
-    for (final p in poses) {
-      final lm = p.landmarks;
-
-      void dot(PoseLandmarkType t) {
-        final l = lm[t];
-        if (l == null) return;
-        canvas.drawCircle(_map(l.x, l.y), 2.0, joint);
+    Offset mapPoint(PoseLandmark l) {
+      var x = l.x * sx + drawRect.left;
+      if (flipX) {
+        final rel = l.x * sx;
+        x = drawRect.left + (drawRect.width - rel);
       }
-
-      void line(PoseLandmarkType a, PoseLandmarkType b) {
-        final la = lm[a], lb = lm[b];
-        if (la == null || lb == null) return;
-        canvas.drawLine(_map(la.x, la.y), _map(lb.x, lb.y), bone);
-      }
-
-      // minimal skeleton
-      line(PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder);
-      line(PoseLandmarkType.leftHip, PoseLandmarkType.rightHip);
-      line(PoseLandmarkType.leftShoulder, PoseLandmarkType.leftElbow);
-      line(PoseLandmarkType.leftElbow, PoseLandmarkType.leftWrist);
-      line(PoseLandmarkType.rightShoulder, PoseLandmarkType.rightElbow);
-      line(PoseLandmarkType.rightElbow, PoseLandmarkType.rightWrist);
-      line(PoseLandmarkType.leftHip, PoseLandmarkType.leftKnee);
-      line(PoseLandmarkType.leftKnee, PoseLandmarkType.leftAnkle);
-      line(PoseLandmarkType.rightHip, PoseLandmarkType.rightKnee);
-      line(PoseLandmarkType.rightKnee, PoseLandmarkType.rightAnkle);
-
-      for (final t in lm.keys) {
-        dot(t);
-      }
+      final y = l.y * sy + drawRect.top;
+      return Offset(x, y);
     }
 
-    // Reps label
-    final tp = TextPainter(
-      text: TextSpan(
-        text: 'Reps: $repCount',
-        style: const TextStyle(fontSize: 20, color: Colors.white),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    tp.paint(canvas, const Offset(12, 12));
+    void line(Map<PoseLandmarkType, PoseLandmark> lm,
+        PoseLandmarkType a, PoseLandmarkType b) {
+      final la = lm[a];
+      final lb = lm[b];
+      if (la == null || lb == null) return;
+      final pa = mapPoint(la);
+      final pb = mapPoint(lb);
+      canvas.drawLine(pa, pb, boneShadow);
+      canvas.drawLine(pa, pb, bone);
+    }
+
+    void dot(PoseLandmark l) {
+      final p = mapPoint(l);
+      canvas.drawCircle(p, 4.5, jointShadow);
+      canvas.drawCircle(p, 3.0, joint);
+    }
+
+    for (final pose in poses) {
+      final lm = pose.landmarks;
+
+      // Torso
+      line(lm, PoseLandmarkType.leftShoulder, PoseLandmarkType.rightShoulder);
+      line(lm, PoseLandmarkType.leftHip, PoseLandmarkType.rightHip);
+      line(lm, PoseLandmarkType.leftShoulder, PoseLandmarkType.leftHip);
+      line(lm, PoseLandmarkType.rightShoulder, PoseLandmarkType.rightHip);
+
+      // Arms
+      line(lm, PoseLandmarkType.leftShoulder, PoseLandmarkType.leftElbow);
+      line(lm, PoseLandmarkType.leftElbow, PoseLandmarkType.leftWrist);
+      line(lm, PoseLandmarkType.rightShoulder, PoseLandmarkType.rightElbow);
+      line(lm, PoseLandmarkType.rightElbow, PoseLandmarkType.rightWrist);
+
+      // Legs
+      line(lm, PoseLandmarkType.leftHip, PoseLandmarkType.leftKnee);
+      line(lm, PoseLandmarkType.leftKnee, PoseLandmarkType.leftAnkle);
+      line(lm, PoseLandmarkType.rightHip, PoseLandmarkType.rightKnee);
+      line(lm, PoseLandmarkType.rightKnee, PoseLandmarkType.rightAnkle);
+
+      // Dots
+      for (final l in lm.values) {
+        dot(l);
+      }
+    }
   }
 
   @override
-  bool shouldRepaint(covariant PosePainter old) =>
-      old.poses != poses ||
-      old.repCount != repCount ||
-      old.imageSize != imageSize ||
-      old.isFrontCamera != isFrontCamera;
+  bool shouldRepaint(covariant PosePainter oldDelegate) =>
+      oldDelegate.poses != poses ||
+      oldDelegate.imageSize != imageSize ||
+      oldDelegate.drawRect != drawRect ||
+      oldDelegate.flipX != flipX;
 }
