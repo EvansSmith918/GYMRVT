@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import 'pages/home_page.dart';
 import 'pages/workout_page.dart';
-import 'pages/camera_page.dart';
+import 'pages/photo_advisor_page.dart'; // <-- use photo upload analysis page
 import 'pages/profile_root_page.dart'; // <-- root for profile flow
 import 'widgets/app_background.dart';
 
@@ -44,8 +44,8 @@ class _MainPageState extends State<MainPage> {
   final List<Widget> _pages = const [
     HomePage(),
     WorkoutPage(),
-    CameraPage(),
-    ProfileRoot(), // <-- instead of ProfilePage
+    PhotoAdvisorPage(), // <-- swapped in here
+    ProfileRoot(),      // <-- instead of ProfilePage
   ];
 
   @override

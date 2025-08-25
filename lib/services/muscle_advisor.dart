@@ -1,111 +1,154 @@
-import 'dart:math' as math;
+// lib/services/muscle_advisor.dart
+import 'dart:math';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
+import 'package:gymrvt/services/workout_store.dart';
 
-/// Lightweight result object you can display in UI.
 class MuscleAdvice {
-  final List<String> focus;   // muscles likely working / under load
-  final List<String> caution; // potential asymmetry or form issues
   final String summary;
-
-  const MuscleAdvice({
-    required this.focus,
-    required this.caution,
-    required this.summary,
-  });
+  final List<String> focus;   // needs more work
+  final List<String> caution; // possibly fatigued / overused
+  MuscleAdvice({required this.summary, required this.focus, required this.caution});
 }
 
 class MuscleAdvisor {
-  /// Returns the interior angle (in degrees) at landmark B formed by A–B–C.
-  static double? _angle(PoseLandmark? a, PoseLandmark? b, PoseLandmark? c) {
-    if (a == null || b == null || c == null) return null;
-    final abx = a.x - b.x, aby = a.y - b.y;
-    final cbx = c.x - b.x, cby = c.y - b.y;
+  /// Keywords => muscle groups (very simple heuristic).
+  /// You can expand these lists anytime.
+  static final Map<String, List<String>> _map = {
+    // Upper
+    'bench': ['chest', 'triceps', 'front delts'],
+    'press': ['shoulders', 'triceps'],
+    'overhead': ['shoulders', 'triceps'],
+    'ohp': ['shoulders', 'triceps'],
+    'incline': ['upper chest', 'front delts'],
+    'push-up': ['chest', 'triceps'],
+    'push up': ['chest', 'triceps'],
+    'dip': ['triceps', 'chest'],
+    'curl': ['biceps'],
+    'pull-up': ['lats', 'biceps'],
+    'pull up': ['lats', 'biceps'],
+    'row': ['lats', 'mid-back', 'biceps'],
+    'face pull': ['rear delts', 'upper back'],
+    'lateral': ['side delts'],
 
-    final dot = abx * cbx + aby * cby;
-    final mag1 = math.sqrt(abx * abx + aby * aby);
-    final mag2 = math.sqrt(cbx * cbx + cby * cby);
-    if (mag1 == 0 || mag2 == 0) return null;
+    // Lower
+    'squat': ['quads', 'glutes', 'core'],
+    'deadlift': ['glutes', 'hamstrings', 'lower back'],
+    'rdl': ['hamstrings', 'glutes'],
+    'leg press': ['quads', 'glutes'],
+    'lunge': ['quads', 'glutes'],
+    'calf': ['calves'],
 
-    final cos = (dot / (mag1 * mag2)).clamp(-1.0, 1.0);
-    return math.acos(cos) * 180 / math.pi;
+    // Core
+    'plank': ['core'],
+    'crunch': ['abs'],
+    'sit-up': ['abs'],
+  };
+
+  static List<String> _groupsForExercise(String name) {
+    final n = name.toLowerCase();
+    final hits = <String>{};
+    for (final k in _map.keys) {
+      if (n.contains(k)) {
+        hits.addAll(_map[k]!);
+      }
+    }
+    // if nothing matched, take a guess based on common words
+    if (hits.isEmpty) {
+      if (n.contains('bench')) hits.addAll(['chest','triceps']);
+      if (n.contains('press')) hits.addAll(['shoulders','triceps']);
+      if (n.contains('row') || n.contains('pull')) hits.addAll(['lats','biceps']);
+    }
+    return hits.toList();
   }
 
-  /// Very small set of heuristics to guess involved muscle groups
-  /// and flag simple asymmetries from a single Pose frame.
-  static MuscleAdvice analyze(Pose pose) {
+  /// Compute recent volume (last 7d vs previous 21d) per muscle group.
+  static Future<(Map<String,double> last7, Map<String,double> prev21)> _volumeWindows() async {
+    final all = await WorkoutStore().allDays(newestFirst: true);
+    final now = DateTime.now();
+    final start7  = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
+    final start28 = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 27));
+
+    final last7  = <String,double>{};
+    final prev21 = <String,double>{};
+
+    for (final d in all) {
+      final dt = DailyWorkout.parseYmd(d.ymd);
+      if (dt.isBefore(start28)) break;
+
+      for (final ex in d.exercises) {
+        final groups = _groupsForExercise(ex.name);
+        if (groups.isEmpty) continue;
+        final vol = ex.totalVolume;
+        final target = dt.isBefore(start7) ? prev21 : last7;
+        for (final g in groups) {
+          target[g] = (target[g] ?? 0) + vol / groups.length; // split volume
+        }
+      }
+    }
+    return (last7, prev21);
+  }
+
+  /// Optional: add tiny posture hints when a pose is available.
+  static List<String> _postureNotes(Pose? pose) {
+    if (pose == null) return const [];
     final lm = pose.landmarks;
+    final lShoulder = lm[PoseLandmarkType.leftShoulder];
+    final rShoulder = lm[PoseLandmarkType.rightShoulder];
+    final lHip = lm[PoseLandmarkType.leftHip];
+    final rHip = lm[PoseLandmarkType.rightHip];
 
-    // Joint angles
-    final leftKnee  = _angle(
-      lm[PoseLandmarkType.leftHip],
-      lm[PoseLandmarkType.leftKnee],
-      lm[PoseLandmarkType.leftAnkle],
-    );
-    final rightKnee = _angle(
-      lm[PoseLandmarkType.rightHip],
-      lm[PoseLandmarkType.rightKnee],
-      lm[PoseLandmarkType.rightAnkle],
-    );
+    final notes = <String>[];
 
-    final leftElbow  = _angle(
-      lm[PoseLandmarkType.leftShoulder],
-      lm[PoseLandmarkType.leftElbow],
-      lm[PoseLandmarkType.leftWrist],
-    );
-    final rightElbow = _angle(
-      lm[PoseLandmarkType.rightShoulder],
-      lm[PoseLandmarkType.rightElbow],
-      lm[PoseLandmarkType.rightWrist],
-    );
+    if (lShoulder != null && rShoulder != null) {
+      final dy = (lShoulder.y - rShoulder.y).abs();
+      if (dy > 20) notes.add('Shoulder height looks uneven; add mobility/scap work.');
+    }
+    if (lHip != null && rHip != null) {
+      final dy = (lHip.y - rHip.y).abs();
+      if (dy > 20) notes.add('Hip height looks uneven; address glute/hip stability.');
+    }
+    return notes;
+  }
 
-    // Hip angle on one side (proxy for hip hinge depth)
-    final hipAngle = _angle(
-      lm[PoseLandmarkType.leftShoulder],
-      lm[PoseLandmarkType.leftHip],
-      lm[PoseLandmarkType.leftKnee],
-    );
+  /// Main entry: combine (optional) pose + your recent training to produce advice.
+  static Future<MuscleAdvice> analyze({Pose? pose}) async {
+    final (last7, prev21) = await _volumeWindows();
 
+    // Find groups with unusually HIGH recent volume (fatigue) and LOW volume (needs work).
     final focus = <String>[];
     final caution = <String>[];
 
-    // Heuristics
-    // Deep knee flexion suggests squat/knee-dominant work → quads/glutes.
-    if ((leftKnee ?? 999) < 100 || (rightKnee ?? 999) < 100) {
-      focus.add('Quads/Glutes');
+    // Normalize by prior average to be device/weight agnostic
+    for (final g in {...last7.keys, ...prev21.keys}) {
+      final recent = last7[g] ?? 0;
+      final base = max(prev21[g] ?? 0, 1.0); // avoid /0
+      final ratio = recent / (base / 3.0); // prev21 is 3× the days of last7
+
+      // Heuristics:
+      if (recent < 200 && ratio < 0.6) {
+        focus.add(g); // underworked
+      } else if (recent > 800 && ratio > 1.3) {
+        caution.add('Possible fatigue in $g — dial back volume or intensity if sore.');
+      }
     }
 
-    // Elbow flexion suggests arm work; include shoulders as stabilizers.
-    if ((leftElbow ?? 999) < 100 || (rightElbow ?? 999) < 100) {
-      focus.add('Biceps/Triceps & Shoulders');
+    // Posture notes (optional)
+    final notes = _postureNotes(pose);
+    caution.addAll(notes);
+
+    String summary;
+    if (focus.isEmpty && caution.isEmpty) {
+      summary = 'Training looks balanced this week. Keep it up!';
+    } else if (focus.isNotEmpty && caution.isNotEmpty) {
+      summary = 'Mix of underworked and possibly overworked areas this week.';
+    } else if (focus.isNotEmpty) {
+      summary = 'Some areas appear underworked this week.';
+    } else {
+      summary = 'Some areas may be fatigued this week.';
     }
 
-    // Smaller hip angle → more hinge → posterior chain.
-    if (hipAngle != null && hipAngle < 120) {
-      focus.add('Glutes/Hamstrings (hinge)');
-    }
-
-    // Simple asymmetry checks.
-    if (leftKnee != null && rightKnee != null &&
-        (leftKnee - rightKnee).abs() > 12) {
-      caution.add('Knee symmetry (shift weight evenly)');
-    }
-    if (leftElbow != null && rightElbow != null &&
-        (leftElbow - rightElbow).abs() > 12) {
-      caution.add('Arm symmetry (keep elbows even)');
-    }
-
-    final summary = [
-      if (focus.isEmpty)
-        'No clear contraction pattern — try holding a representative pose.',
-      if (focus.isNotEmpty) 'Likely working: ${focus.toSet().join(", ")}.',
-      if (caution.isNotEmpty) 'Watch out: ${caution.join(", ")}.'
-    ].join(' ');
-
-    return MuscleAdvice(
-      focus: focus.toSet().toList(),
-      caution: caution,
-      summary: summary,
-    );
+    return MuscleAdvice(summary: summary, focus: focus..sort(), caution: caution);
   }
 }
+
 
