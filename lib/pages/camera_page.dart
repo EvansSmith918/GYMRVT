@@ -39,7 +39,7 @@ class _CameraPageState extends State<CameraPage> {
   }
 
   Future<void> _boot() async {
-    await _cam.init(); // Back camera, YUV, high res
+    await _cam.init(); // default back camera
     if (!mounted) return;
     setState(() {});
     await _cam.start(_onImage);
@@ -50,11 +50,9 @@ class _CameraPageState extends State<CameraPage> {
     final camDesc = _cam.controller!.description;
     _imageSize = Size(img.width.toDouble(), img.height.toDouble());
 
-    // Run ML Kit pose
     final poses = await _pose.process(img, camDesc);
     if (!mounted) return;
 
-    // Choose a robust proxy for vertical motion (hips work well for squats)
     double? proxyY;
     if (poses.isNotEmpty) {
       final lm = poses.first.landmarks;
@@ -62,7 +60,6 @@ class _CameraPageState extends State<CameraPage> {
       final rh = lm[PoseLandmarkType.rightHip]?.y;
       if (lh != null && rh != null) {
         proxyY = (lh + rh) / 2.0;
-        // normalize 0..1 (0 top, 1 bottom)
         proxyY = (proxyY / _imageSize.height).clamp(0.0, 1.0);
       }
     }
@@ -80,18 +77,21 @@ class _CameraPageState extends State<CameraPage> {
 
       final RepEvent? evt = _counter.update(y, vel, t);
       if (evt != null) {
-        setState(() {
-          _reps += 1;
-        });
-
-        // TODO: integrate with your existing logger/store if desired:
-        // await WorkoutStore.instance.addRep(evt);  // <-  API
+        setState(() => _reps += 1);
+        // hook into your logger if desired
       }
     }
 
-    setState(() {
-      _poses = poses;
-    });
+    setState(() => _poses = poses);
+  }
+
+  Future<void> _flipCamera() async {
+    // Requires a corresponding method in CameraStream. If your name differs,
+    // replace with that method (e.g., toggle(), switchLens(), etc).
+    await _cam.switchCamera();
+    if (!mounted) return;
+    setState(() {});             // refresh AppBar icon/preview aspect ratio
+    await _cam.start(_onImage);  // restart the stream into pose detection
   }
 
   @override
@@ -104,24 +104,47 @@ class _CameraPageState extends State<CameraPage> {
   @override
   Widget build(BuildContext context) {
     final ctrl = _cam.controller;
+
+    if (!(_cam.isReady) || ctrl == null || !ctrl.value.isInitialized) {
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    // Use AspectRatio to show the entire frame (no cropping) and then
+    // paint the pose overlay on top at the same size.
+    final previewWithOverlay = AspectRatio(
+      aspectRatio: ctrl.value.aspectRatio,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          CameraPreview(ctrl),
+          CustomPaint(
+            painter: PosePainter(
+              poses: _poses,
+              imageSize: _imageSize,
+              repCount: _reps,
+            ),
+          ),
+        ],
+      ),
+    );
+
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(title: const Text('Camera • Live Pose')),
-      body: (!(_cam.isReady) || ctrl == null)
-          ? const Center(child: CircularProgressIndicator())
-          : Stack(
-              fit: StackFit.expand,
-              children: [
-                CameraPreview(ctrl),
-                CustomPaint(
-                  painter: PosePainter(
-                    poses: _poses,
-                    imageSize: _imageSize,
-                    repCount: _reps,
-                  ),
-                ),
-              ],
-            ),
+      appBar: AppBar(
+        title: const Text('Camera • Live Pose'),
+        backgroundColor: Colors.black,
+        actions: [
+          IconButton(
+            tooltip: 'Flip camera',
+            icon: const Icon(Icons.cameraswitch),
+            onPressed: _flipCamera,
+          ),
+        ],
+      ),
+      body: Center(child: previewWithOverlay), // centers with letterboxing when needed
     );
   }
 }
