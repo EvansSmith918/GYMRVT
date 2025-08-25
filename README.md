@@ -1,5 +1,4 @@
 # GYMRVT
-# GYMRVT
 ![GYMRVT Banner](assets/tflite_model/images/adaptive_fg_gymrvt_blue.svg)
 
 **GYMRVT** is a free, open-source mobile app that uses AI and your phone's camera to track weightlifting performance in real time. No sensors, no subscriptions — just your camera and smart computer vision.
