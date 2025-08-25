@@ -69,43 +69,46 @@ class _ExerciseInsightsPageState extends State<ExerciseInsightsPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
       ),
-      body: Padding(
+      body: ListView(
         padding: const EdgeInsets.all(16),
-        child: _exNames.isEmpty
-            ? const Center(child: Text('Log some workouts to see insights.'))
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _exercisePicker(),
-                  const SizedBox(height: 12),
-                  if (_loading) const LinearProgressIndicator(),
-                  if (!_loading) ...[
-                    _prCard(),
-                    const SizedBox(height: 12),
-                    _chartCard(
-                      title: 'Estimated 1RM',
-                      height: 220,
-                      child: _oneRmPts.isEmpty
-                          ? const Center(child: Padding(
-                              padding: EdgeInsets.all(16),
-                              child: Text('No data yet for this exercise.'),
-                            ))
-                          : _lineChart(_oneRmPts),
-                    ),
-                    const SizedBox(height: 12),
-                    _chartCard(
-                      title: 'Daily Volume (lb)',
-                      height: 220,
-                      child: _volPts.isEmpty
-                          ? const Center(child: Padding(
-                              padding: EdgeInsets.all(16),
-                              child: Text('No volume logged yet.'),
-                            ))
-                          : _barChart(_volPts),
-                    ),
-                  ],
-                ],
+        children: [
+          if (_exNames.isEmpty)
+            const Center(child: Text('Log some workouts to see insights.'))
+          else ...[
+            _exercisePicker(),
+            const SizedBox(height: 12),
+            if (_loading) const LinearProgressIndicator(),
+            if (!_loading) ...[
+              _prCard(),
+              const SizedBox(height: 12),
+              _chartCard(
+                title: 'Estimated 1RM',
+                height: 220,
+                child: _oneRmPts.isEmpty
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Text('No data yet for this exercise.'),
+                        ),
+                      )
+                    : _lineChart(_oneRmPts),
               ),
+              const SizedBox(height: 12),
+              _chartCard(
+                title: 'Daily Volume (lb)',
+                height: 220,
+                child: _volPts.isEmpty
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Text('No volume logged yet.'),
+                        ),
+                      )
+                    : _barChart(_volPts),
+              ),
+            ],
+          ],
+        ],
       ),
     );
   }
@@ -154,7 +157,21 @@ class _ExerciseInsightsPageState extends State<ExerciseInsightsPage> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
-            SizedBox(height: height, child: child),
+            SizedBox(
+              height: height,
+              child: const Padding(
+                padding: EdgeInsets.only(bottom: 16), // space for x-axis labels
+                child: SizedBox.expand(), // placeholder; real child added below
+              ),
+            ),
+            // Insert the actual chart below so padding doesn't wrap the title
+            SizedBox(
+              height: height,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: child,
+              ),
+            ),
           ],
         ),
       ),
@@ -169,21 +186,23 @@ class _ExerciseInsightsPageState extends State<ExerciseInsightsPage> {
       pts.length,
       (i) => FlSpot(i.toDouble(), pts[i].value),
     );
-    final minY = (pts.map((e) => e.value).reduce((a, b) => a < b ? a : b) * 0.95);
-    final maxY = (pts.map((e) => e.value).reduce((a, b) => a > b ? a : b) * 1.05);
+    final minVal = pts.map((e) => e.value).reduce((a, b) => a < b ? a : b);
+    final maxVal = pts.map((e) => e.value).reduce((a, b) => a > b ? a : b);
+    final minY = minVal * 0.95;
+    final maxY = maxVal * 1.05;
 
     return LineChart(
       LineChartData(
         gridData: FlGridData(show: false),
         borderData: FlBorderData(show: false),
         titlesData: FlTitlesData(
-          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              interval: (maxY - minY) <= 1 ? 1 : null,
-              reservedSize: 38,
+              interval: (maxY - minY) <= 1 ? 1.0 : null, // <-- double
+              reservedSize: 40.0,                          // <-- double
             ),
           ),
           bottomTitles: AxisTitles(
@@ -208,7 +227,7 @@ class _ExerciseInsightsPageState extends State<ExerciseInsightsPage> {
           LineChartBarData(
             spots: spots,
             isCurved: true,
-            dotData: FlDotData(show: true),
+            dotData: const FlDotData(show: true),
           ),
         ],
       ),
@@ -223,23 +242,26 @@ class _ExerciseInsightsPageState extends State<ExerciseInsightsPage> {
         barRods: [
           BarChartRodData(
             toY: pts[i].value,
-            width: 12,
+            width: 12.0, // <-- double
             borderRadius: BorderRadius.circular(4),
           ),
         ],
       );
     });
 
-    final maxY = pts.map((e) => e.value).fold<double>(0, (m, v) => v > m ? v : m) * 1.1;
+    final maxYVal = pts.map((e) => e.value).fold<double>(0, (m, v) => v > m ? v : m);
+    final maxY = (maxYVal <= 0 ? 100.0 : maxYVal * 1.1); // <-- doubles
 
     return BarChart(
       BarChartData(
         gridData: FlGridData(show: false),
         borderData: FlBorderData(show: false),
         titlesData: FlTitlesData(
-          topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 38)),
+          topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          leftTitles: const AxisTitles(
+            sideTitles: SideTitles(showTitles: true, reservedSize: 40.0), // <-- double
+          ),
           bottomTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
@@ -255,7 +277,7 @@ class _ExerciseInsightsPageState extends State<ExerciseInsightsPage> {
           ),
         ),
         barGroups: groups,
-        maxY: maxY <= 0 ? 100 : maxY,
+        maxY: maxY,
       ),
     );
   }
