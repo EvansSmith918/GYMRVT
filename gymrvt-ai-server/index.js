@@ -3,6 +3,7 @@ import cors from "cors";
 import multer from "multer";
 import fs from "fs";
 import OpenAI from "openai";
+import 'dotenv/config';
 
 const app = express();
 const upload = multer({ dest: "uploads/", limits: { fileSize: 8 * 1024 * 1024 } }); // 8 MB
