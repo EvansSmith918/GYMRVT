@@ -1,3 +1,4 @@
+# pubspec.yaml  (replace the whole file with this)
 name: gymrvt
 description: "A new Flutter project."
 publish_to: 'none'
@@ -5,18 +6,23 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.8.1
+  # Broaden the Dart SDK range so pub can resolve packages on current Flutter
+  sdk: ">=3.3.0 <4.0.0"
 
 dependencies:
   flutter:
     sdk: flutter
   cupertino_icons: ^1.0.8
 
+  # Nutrition helper deps
+  sqflite: ^2.3.3+1
+  path: ^1.9.0
+  mobile_scanner: ^7.0.1
+
   # Camera / media
   camera: ^0.10.5+7
   image_picker: ^1.1.0
   path_provider: ^2.1.2
-  path: ^1.9.1
   cross_file: ^0.3.4+2
   share_plus: ^10.0.2
 
@@ -34,16 +40,14 @@ dependencies:
   fl_chart: ^0.64.0
   intl: ^0.19.0
   flutter_colorpicker: ^1.0.3
-  http: ^1.2.2   # <-- NEW for remote AI API calls
-  sqflite: ^2.4.2
-  mobile_scanner: ^7.0.1
+  http: ^1.2.2   # <-- for remote AI/API calls
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
 
-  # --- Added for app icons & splash ---
+  # --- App icons & splash ---
   flutter_launcher_icons: ^0.13.1
   flutter_native_splash: ^2.4.0
 
@@ -55,7 +59,6 @@ flutter:
   uses-material-design: true
   assets:
     - assets/avatar_placeholder.png
-    # Include your README logo folder (place app_icon.png here)
     - assets/icon/
 
 # --- App icon config (uses assets/icon/app_icon.png) ---
