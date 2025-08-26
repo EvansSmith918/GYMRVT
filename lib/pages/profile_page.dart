@@ -142,7 +142,7 @@ class _ProfilePageState extends State<ProfilePage> {
     await _appearance.setImage(saved.path);
   }
 
-  // ✅ Real HealthKit / Google Fit integration
+  //  Real HealthKit / Google Fit integration
   Future<void> _connectToHealthApps(BuildContext bc) async {
     final ok = await HealthService.instance.requestAuthorization();
     if (!mounted) return;
@@ -237,7 +237,7 @@ class _ProfilePageState extends State<ProfilePage> {
                                       s.type == BgType.color
                                           ? 'Using background color'
                                           : (s.imagePath != null
-                                              ? 'Using background image'
+                                              ?''
                                               : 'No image set'),
                                     ),
                                   ),

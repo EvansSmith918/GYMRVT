@@ -22,14 +22,26 @@ app.get("/health", (_, res) => res.json({ ok: true }));
  * Returns: { summary: string, focus: string[], caution: string[] }
  */
 app.post("/analyze", upload.single("image"), async (req, res) => {
-  if (!req.file) return res.status(400).json({ error: "No image uploaded." });
+  let base64;
 
-  const path = req.file.path;
   try {
-    // Read image and base64 encode
-    const base64 = fs.readFileSync(path, { encoding: "base64" });
+    // Case A: multipart/form-data (file field = "image")
+    if (req.file) {
+      base64 = fs.readFileSync(req.file.path, { encoding: "base64" });
+    }
 
-    // Ask the model to return STRICT JSON so Flutter can parse it easily
+    // Case B: JSON { "image": "<base64>" }
+    if (!base64 && req.is("application/json") && req.body?.image) {
+      base64 = req.body.image.trim();
+      // Strip data URL prefix if present
+      const comma = base64.indexOf(",");
+      if (comma !== -1) base64 = base64.slice(comma + 1);
+    }
+
+    if (!base64) {
+      return res.status(400).json({ error: "No image provided (multipart or JSON Base64)." });
+    }
+
     const prompt = `
 You are a fitness advisor AI. Analyze the user's physique from the image and
 return STRICT JSON with these keys only:
@@ -38,7 +50,7 @@ return STRICT JSON with these keys only:
   "focus": ["underworked-muscle", "..."],
   "caution": ["possibly-fatigued/overused note ...", "..."]
 }
-Keep it concise, no markdown or extra text outside JSON.
+No markdown. Only JSON.
 `;
 
     const resp = await openai.chat.completions.create({
@@ -49,10 +61,7 @@ Keep it concise, no markdown or extra text outside JSON.
           role: "user",
           content: [
             { type: "text", text: prompt },
-            {
-              type: "image_url",
-              image_url: { url: `data:image/jpeg;base64,${base64}` }
-            }
+            { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64}` } }
           ]
         }
       ],
@@ -63,21 +72,26 @@ Keep it concise, no markdown or extra text outside JSON.
     try {
       json = JSON.parse(resp.choices[0].message.content);
     } catch {
-      // fallback: return all text inside 'summary'
       json = { summary: resp.choices[0].message.content, focus: [], caution: [] };
     }
 
-    res.json({
+    return res.json({
       summary: json.summary ?? "Analysis complete.",
       focus: Array.isArray(json.focus) ? json.focus : [],
       caution: Array.isArray(json.caution) ? json.caution : []
     });
+
   } catch (e) {
     console.error(e);
-    res.status(500).json({ error: "Failed to analyze image." });
+    return res.status(500).json({ error: "Failed to analyze image." });
   } finally {
-    fs.existsSync(path) && fs.unlinkSync(path); // cleanup temp file
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
   }
+  app.use((err, req, res, next) => {
+  if (err && err.code === "LIMIT_FILE_SIZE") {
+    return res.status(413).json({ error: "Image too large. Try a smaller photo." });
+  }
+  next(err);
 });
-
+});
 app.listen(port, () => console.log(`AI server running on http://localhost:${port}`));
