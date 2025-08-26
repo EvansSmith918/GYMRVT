@@ -1,7 +1,8 @@
-// ignore_for_file: use_build_context_synchronously
+// ignore_for_file: use_build_context_synchronously 
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart'; // NEW
 
 import 'package:gymrvt/services/workout_store.dart';
 import 'package:gymrvt/services/rep_logger.dart';
@@ -45,6 +46,21 @@ class _WorkoutPageState extends State<WorkoutPage> {
 
   Map<String, double> _suggestedLb = const {};
 
+  // Persisted “finished” flag for today
+  bool _finishedToday = false;
+
+  // ---- finish flag helpers ----
+  String _ymd(DateTime d) => DateFormat('yyyy-MM-dd').format(d);
+  Future<bool> _getFinishedFlag(DateTime d) async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('finished_${_ymd(d)}') ?? false;
+    }
+  Future<void> _setFinishedFlag(DateTime d, bool v) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('finished_${_ymd(d)}', v);
+  }
+  // --------------------------------
+
   @override
   void initState() {
     super.initState();
@@ -71,6 +87,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
     final r = await UserPrefs.restSeconds();
     final d = await WorkoutStore().getDay(_today);
     final sugg = await ProgramTemplates.loadSuggestions(_today);
+    final finished = await _getFinishedFlag(_today); // NEW
 
     if (!mounted) return;
     setState(() {
@@ -79,6 +96,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
       _day = d;
       _suggestedLb = sugg;
       _loading = false;
+      _finishedToday = finished; // NEW
     });
 
     _prByName.clear();
@@ -138,6 +156,12 @@ class _WorkoutPageState extends State<WorkoutPage> {
   void _add30s() => setState(() => _restRemaining += 30);
 
   Future<void> _addExercise({String? presetName}) async {
+    // Adding anything “reopens” today
+    if (_finishedToday) {
+      await _setFinishedFlag(_today, false);
+      setState(() => _finishedToday = false);
+    }
+
     String name = presetName ?? _newExerciseCtl.text.trim();
     if (name.isEmpty) {
       final picked = await Navigator.of(context).push<String>(
@@ -348,7 +372,9 @@ class _WorkoutPageState extends State<WorkoutPage> {
       _weightCtl.clear();
       _prByName.clear();
       _cancelRestTimer();
+      _finishedToday = false;
     });
+    await _setFinishedFlag(_today, false); // NEW
     await _syncWeeklyChart();
   }
 
@@ -399,6 +425,39 @@ class _WorkoutPageState extends State<WorkoutPage> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Close')),
         ],
       ),
+    );
+  }
+
+  // Finish flow (now persisted)
+  Future<void> _finishWorkout() async {
+    if (_day == null || _day!.exercises.isEmpty) return;
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Finish workout?'),
+        content: const Text(
+          'Your sets are saved. We\'ll take you to History and keep this screen clean '
+          'so you can start fresh later.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Finish')),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    await _setFinishedFlag(_today, true); // NEW: persist
+    setState(() => _finishedToday = true);
+
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const WorkoutHistoryPage()),
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Workout finished. Add an exercise to start a fresh session.')),
     );
   }
 
@@ -456,6 +515,12 @@ class _WorkoutPageState extends State<WorkoutPage> {
           ),
           if (day != null && day.exercises.isNotEmpty)
             IconButton(
+              tooltip: 'Finish workout',
+              icon: const Icon(Icons.check_circle_outline),
+              onPressed: _finishWorkout,
+            ),
+          if (day != null && day.exercises.isNotEmpty)
+            IconButton(
               tooltip: 'Clear today',
               icon: const Icon(Icons.delete_outline),
               onPressed: _clearDay,
@@ -474,19 +539,39 @@ class _WorkoutPageState extends State<WorkoutPage> {
                 const SizedBox(height: 8),
                 const StreakGoalHeader(),
                 const SizedBox(height: 12),
+
+                // Always visible
                 _addExerciseRow(),
-                const SizedBox(height: 12),
-                ...day.exercises.map((ex) => _exerciseCard(ex, numFmt)),
-                if (day.exercises.isEmpty)
+
+                if (_finishedToday) ...[
+                  const SizedBox(height: 12),
                   Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
+                    color: Colors.green.withOpacity(0.1),
+                    child: const Padding(
+                      padding: EdgeInsets.all(16),
                       child: Text(
-                        'No exercises yet today. Add your first one!',
-                        style: Theme.of(context).textTheme.bodyMedium,
+                        'Workout finished — view it in History.\nAdd a new exercise to start a fresh session.',
+                        style: TextStyle(fontWeight: FontWeight.w600),
                       ),
                     ),
                   ),
+                ],
+
+                const SizedBox(height: 12),
+
+                if (!_finishedToday) ...[
+                  ...day.exercises.map((ex) => _exerciseCard(ex, numFmt)),
+                  if (day.exercises.isEmpty)
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          'No exercises yet today. Add your first one!',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                    ),
+                ],
               ],
             ),
           if (_restRemaining > 0)
@@ -534,7 +619,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
           children: [
             const Icon(Icons.summarize),
             const SizedBox(width: 10),
-            Expanded( // <-- fixes tiny overflow on narrow phones
+            Expanded(
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 alignment: Alignment.centerLeft,
@@ -633,7 +718,6 @@ class _WorkoutPageState extends State<WorkoutPage> {
               ),
             ),
             const SizedBox(height: 8),
-            // ---- FIXED: controls wrap on small screens (no 220px overflow)
             Wrap(
               spacing: 8,
               runSpacing: 8,

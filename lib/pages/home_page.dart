@@ -19,6 +19,8 @@ import 'package:gymrvt/pages/settings_page.dart';
 
 // NEW: Nutrition card
 import 'package:gymrvt/widgets/todays_macros_card.dart';
+// NEW: Goals editor
+import 'package:gymrvt/pages/edit_targets_page.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -55,6 +57,9 @@ class _HomePageState extends State<HomePage> {
   List<DailyWorkout> _recent = const [];
 
   bool _loading = true;
+
+  // Force the macros card to rebuild after editing goals
+  int _macrosRev = 0;
 
   @override
   void initState() {
@@ -249,6 +254,16 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+  Future<void> _editGoals() async {
+    final changed = await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const EditTargetsPage()),
+    );
+    if (changed == true && mounted) {
+      // bump key so TodaysMacrosCard re-initializes and reloads targets
+      setState(() => _macrosRev++);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -305,7 +320,7 @@ class _HomePageState extends State<HomePage> {
                 icon: Icons.history,
                 label: 'History',
                 onTap: () => Navigator.of(context).push(
-                  MaterialPageRoute(builder: (_) => const WorkoutHistoryPage()),
+                  MaterialPageRoute(builder: (_) => const WorkoutHistoryPage() ),
                 ),
               ),
               _quickAction(
@@ -335,8 +350,17 @@ class _HomePageState extends State<HomePage> {
 
           const SizedBox(height: 12),
 
-          // Nutrition: today's macros + coach line + Log meal / Scan barcode
-          const TodaysMacrosCard(),
+          // Nutrition: today's macros + coach line
+          TodaysMacrosCard(key: ValueKey(_macrosRev)),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: OutlinedButton.icon(
+              onPressed: _editGoals,
+              icon: const Icon(Icons.edit, size: 16),
+              label: const Text("Edit nutrition goals"),
+            ),
+          ),
 
           const SizedBox(height: 12),
 
