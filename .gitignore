@@ -18,3 +18,7 @@ ios/Flutter/Flutter.framework
 ios/Flutter/Flutter.podspec
 ios/Pods/
 ios/Runner.xcworkspace/
+
+# Node.js backend
+gymrvt-ai-server/node_modules/
+gymrvt-ai-server/.env
