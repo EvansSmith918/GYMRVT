@@ -4,12 +4,12 @@ import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 class PosePainter extends CustomPainter {
   final List<Pose> poses;
   final Size imageSize;
-  final int repCount;
+  
 
   PosePainter({
     required this.poses,
     required this.imageSize,
-    required this.repCount,
+    
   });
 
   @override
@@ -65,7 +65,7 @@ class PosePainter extends CustomPainter {
 
     final tp = TextPainter(
       text: TextSpan(
-        text: 'Reps: $repCount',
+        text: 'Looking cute!',
         style: const TextStyle(fontSize: 20, color: Colors.white),
       ),
       textDirection: TextDirection.ltr,
@@ -75,6 +75,6 @@ class PosePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant PosePainter old) =>
-      old.poses != poses || old.repCount != repCount || old.imageSize != imageSize;
+      old.poses != poses || old.imageSize != imageSize;
 }
 
