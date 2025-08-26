@@ -1,76 +1,96 @@
-# GYMRVT
 ![GYMRVT Banner](assets/tflite_model/images/adaptive_fg_gymrvt_blue.svg)
 
-**GYMRVT** is a free, open-source mobile app that uses AI and your phone's camera to track weightlifting performance in real time. No sensors, no subscriptions — just your camera and smart computer vision.
+# 🏋️‍♂️ GYMRVT – AI-Powered Gym Companion
 
-## Features
+[![Flutter](https://img.shields.io/badge/Flutter-3.x-blue?logo=flutter)](https://flutter.dev)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![Platform](https://img.shields.io/badge/Platforms-Android%20%7C%20iOS-orange)]()
 
-- Automatic rep counting using real-time pose estimation
-- Bar speed and tempo tracking based on joint movement
-- Offline workout logging with exportable data
-- Audio feedback to announce reps and performance
-- 100% privacy-focused: all processing is local on the device
-- will also connect to Phone Health Apps
-  
+GYMRVT is a free, open-source mobile fitness app that turns your phone into a **real-time training partner**.  
+No wearables. No subscriptions. Just computer vision, AI insights, and your own determination.  
 
-## How It Works
+<p align="center">
+  <img src="assets/tflite_model/images/adaptive_fg_gymrvt_blue.svg" width="200" alt="GYMRVT Logo"/>
+</p>
 
-GYMRVT uses TensorFlow Lite and the MoveNet model to detect body pose landmarks in real time. By analyzing joint angles and vertical movement, it estimates repetitions and bar speed for exercises like squats, bench press, curls, and more.
+---
 
-The app is built with Flutter for smooth cross-platform support and runs entirely offline.
+##  Features
 
-## Tech Stack
+###  Smart Workout Tracking
+- **Pose Estimation** with Google ML Kit.
+- **Automatic Rep Counting** for squats, presses, curls, and more.
+- **Tempo & Velocity Tracking** for bar speed and control.
+- Runs **offline & fully on-device**.
 
-- Flutter (Dart) for cross-platform mobile development
-- TensorFlow Lite with MoveNet for pose detection
-- SQLite for offline data logging
-- Text-to-Speech for real-time audio feedback
-- FL Chart for performance graphing
+###  Training Insights
+- **1RM Estimator** using the Epley formula.
+- **Workout Volume Tracking** (reps × weight).
+- **Interactive Charts** for PRs, weekly volume, and long-term progress.
 
-## Getting Started
+###  AI Photo Advisor
+- Upload a **progress photo** and receive:
+  - Likely **fatigued** or **underdeveloped muscle groups**.
+  - Suggested **focus areas** for next workouts.
+  - **Warnings** about imbalances or posture issues.
+- Powered by **AI analysis** with fallback heuristics.
 
-1. Clone the repository:
-   ```
-   git clone https://github.com/EvansSmith918/GYMRVT
-   cd GYMRVT
-   ```
+###  Profile & Personalization
+- Save **name, age, gender, height, weight**.
+- Track **weight history** with trends.
+- Customize appearance with **background colors or images**.
+- Add your **profile picture**.
 
-2. Install dependencies:
-   ```
-   flutter pub get
-   ```
+###  Health App Integration
+- Syncs with **Google Fit (Android)** and **Apple Health (iOS)**.
+- Currently supports **weight, height, body fat %**.
+- Future expansion: steps, calories, heart rate.
 
-3. Run the app:
-   ```
-   flutter run
-   ```
+###  Workout Logging
+- Create and log **custom exercises**.
+- Track **sets, reps, and weights**.
+- Automatically calculate **training volume**.
+- Stored **locally** with future export options.
 
-Make sure you have Flutter and Dart installed on your system.
+###  Modern UI
+- **Clean dark mode** designed for the gym.
+- **Bottom navigation** for quick access:
+  - **Home** → Overview & trends
+  - **Workout** → Log & track exercises
+  - **Camera** → Real-time tracker or AI Advisor
+  - **Profile** → Personal stats & settings
 
-## Project Structure
+---
 
-```
-GYMRVT/
-├── lib/
-│   ├── main.dart
-│   ├── pages/
-│   ├── services/
-│   ├── utils/
-│   └── widgets/
-├── assets/
-│   └── tflite_model/
-├── pubspec.yaml
-```
+##  Why GYMRVT?
 
-## Contributing
+ **Open-source** – transparent & community-driven  
+ **Private** – no forced accounts or data collection  
+ **Accessible** – works on any phone, no wearables required  
+ **AI-Enhanced** – personalized insights powered by modern AI  
 
-Pull requests are welcome. If you'd like to contribute a feature, fix a bug, or suggest improvements, please open an issue or fork the project and submit a PR.
+---
 
-## License
+##  Screenshots
 
-This project is licensed under the MIT License.
+<p align="center">
+  <img src="docs/screenshots/home.png" width="200" />
+  <img src="docs/screenshots/workout.png" width="200" />
+  <img src="docs/screenshots/camera.png" width="200" />
+  <img src="docs/screenshots/profile.png" width="200" />
+</p>
 
-## Disclaimer
+---
 
-GYMRVT is not a medical or diagnostic tool. It is intended for general fitness tracking only. Use at your own risk and consult a professional for medical or training advice.
+##  Installation
 
+### Prerequisites
+- [Flutter SDK](https://flutter.dev/docs/get-started/install) (3.x)
+- Android Studio or Xcode for building.
+
+### Clone & Run
+```bash
+git clone https://github.com/yourusername/gymrvt.git
+cd gymrvt
+flutter pub get
+flutter run

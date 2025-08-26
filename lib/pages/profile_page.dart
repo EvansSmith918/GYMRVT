@@ -6,12 +6,12 @@ import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
- // Health package integration removed; update the 'health' dependency to re-enable HealthKit/Health Connect integration
 
 import 'package:gymrvt/services/appearance_prefs.dart';
 import 'package:gymrvt/services/weight_history.dart';
 import 'package:gymrvt/widgets/app_background.dart';
 import 'package:gymrvt/pages/profile_overview_page.dart';
+import 'package:gymrvt/services/health_service.dart'; // NEW
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -77,7 +77,7 @@ class _ProfilePageState extends State<ProfilePage> {
     await prefs.setString('height_feet', _heightFeetController.text.trim());
     await prefs.setString('height_inches', _heightInchesController.text.trim());
     await prefs.setString('gender', _gender);
-    await prefs.setBool('profile_complete', true); // <-- mark as complete
+    await prefs.setBool('profile_complete', true);
 
     if (_profileImage != null) {
       await prefs.setString('profileImage', _profileImage!.path);
@@ -89,7 +89,6 @@ class _ProfilePageState extends State<ProfilePage> {
     }
 
     if (!mounted) return;
-    // Replace current edit screen with the Overview
     Navigator.of(bc).pushReplacement(
       MaterialPageRoute(builder: (BuildContext _) => const ProfileOverviewPage()),
     );
@@ -127,7 +126,7 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
     if (selected != null) {
-      await _appearance.setColor(selected); // updates app instantly
+      await _appearance.setColor(selected);
     }
   }
 
@@ -140,24 +139,37 @@ class _ProfilePageState extends State<ProfilePage> {
     final fname = 'bg_${DateTime.now().millisecondsSinceEpoch}${extension(picked.path)}';
     final saved = await File(picked.path).copy('${dir.path}/$fname');
 
-    await _appearance.setImage(saved.path); // updates app instantly
+    await _appearance.setImage(saved.path);
   }
 
+  // ✅ Real HealthKit / Google Fit integration
   Future<void> _connectToHealthApps(BuildContext bc) async {
-    // Health integration is currently disabled because the HealthFactory symbol
-    // is not available in the installed 'health' package version.
-    // To re-enable, update the 'health' package and restore the original
-    // implementation that requests permissions and connects to the platform's
-    // health services.
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('health_connected', false);
+    final ok = await HealthService.instance.requestAuthorization();
     if (!mounted) return;
-    setState(() => _healthConnected = false);
 
+    if (!ok) {
+      setState(() => _healthConnected = false);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('health_connected', false);
+      ScaffoldMessenger.of(bc).showSnackBar(
+        const SnackBar(content: Text('Health permission denied. Enable it in Settings.')),
+      );
+      return;
+    }
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('health_connected', true);
+
+    final latestLb = await HealthService.instance.latestBodyMassLb();
+    if (latestLb != null) {
+      await WeightHistory().upsertToday(latestLb);
+      _weightController.text = latestLb.toStringAsFixed(1);
+    }
+
+    if (!mounted) return;
+    setState(() => _healthConnected = true);
     ScaffoldMessenger.of(bc).showSnackBar(
-      const SnackBar(
-        content: Text('Health integration unavailable: update health package to enable this feature.'),
-      ),
+      const SnackBar(content: Text('Connected to Health.')),
     );
   }
 
@@ -195,7 +207,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
                   const SizedBox(height: 16),
 
-                  // Appearance card
                   AnimatedBuilder(
                     animation: _appearance,
                     builder: (BuildContext _, __) {
@@ -271,7 +282,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
                   const SizedBox(height: 16),
 
-                  // Save + Connect actions
                   Row(
                     children: [
                       Expanded(
