@@ -13,11 +13,21 @@ No wearables. No subscriptions. Just computer vision, AI insights, and your own 
 - **Automatic Rep Counting** for squats, presses, curls, and more.
 - **Tempo & Velocity Tracking** for bar speed and control.
 - Runs **offline & fully on-device**.
+- **Workout Finish Flow**: mark a session complete → it’s moved to History and your Workout page is reset.
 
 ###  Training Insights
 - **1RM Estimator** using the Epley formula.
 - **Workout Volume Tracking** (reps × weight).
 - **Interactive Charts** for PRs, weekly volume, and long-term progress.
+- **Smart Streaks & Weekly Goals** with streak banners on the Home page.
+- **AI Insights & Cautions**: history-based fatigue/focus suggestions.
+
+###  Nutrition Helper
+- **Daily Macros Tracking** (calories, protein, carbs, fat).
+- **Customizable Goals**: set your own calorie & macronutrient targets.
+- **Meal Logging** with quick adds.
+- **Barcode Scanner** for easy entry.
+- AI-powered suggestions
 
 ###  AI Photo Advisor
 - Upload a **progress photo** and receive:
@@ -42,11 +52,12 @@ No wearables. No subscriptions. Just computer vision, AI insights, and your own 
 - Track **sets, reps, and weights**.
 - Automatically calculate **training volume**.
 - Stored **locally** with future export options.
+- Plate math calculator to break down barbell loading.
 
 ###  Modern UI
 - **Clean dark mode** designed for the gym.
 - **Bottom navigation** for quick access:
-  - **Home** → Overview & trends
+  - **Home** → Overview, macros, streaks, insights
   - **Workout** → Log & track exercises
   - **Camera** → Real-time tracker or AI Advisor
   - **Profile** → Personal stats & settings
@@ -62,7 +73,7 @@ No wearables. No subscriptions. Just computer vision, AI insights, and your own 
 
 ---
 
-## Coming to Play Store and IOS Soon
+## Coming to Play Store and iOS Soon
 ---
 
 ##  Installation
