@@ -2,18 +2,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.evans.gymrvt">
 
-    <!-- Network (optional but common) -->
+    <!-- Network (needed for OpenFoodFacts lookups / any API calls) -->
     <uses-permission android:name="android.permission.INTERNET" />
 
-    <!-- Your existing permissions -->
+    <!-- Camera for barcode scanning -->
     <uses-permission android:name="android.permission.CAMERA" />
+    <!-- Declare camera as optional so Play Store doesn't restrict installs -->
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
+
+    <!-- Your existing permissions -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <!-- Health / sensors -->
     <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
     <uses-permission android:name="android.permission.BODY_SENSORS" />
-    <!-- Optional if you will read sensors in the background -->
     <uses-permission android:name="android.permission.BODY_SENSORS_BACKGROUND" />
 
     <!-- Package visibility: Health Connect app -->

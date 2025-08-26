@@ -6,7 +6,14 @@ import 'pages/photo_advisor_page.dart'; // <-- use photo upload analysis page
 import 'pages/profile_root_page.dart'; // <-- root for profile flow
 import 'widgets/app_background.dart';
 
-void main() => runApp(const MyApp());
+// NEW: init the nutrition database before runApp
+import 'package:gymrvt/services/nutrition_store.dart';
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await NutritionStore().init(); // <-- creates tables & default targets
+  runApp(const MyApp());
+}
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
