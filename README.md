@@ -1,17 +1,8 @@
 ![GYMRVT Banner](assets/tflite_model/images/adaptive_fg_gymrvt_blue.svg)
-
-# 🏋️‍♂️ GYMRVT – AI-Powered Gym Companion
-
-[![Flutter](https://img.shields.io/badge/Flutter-3.x-blue?logo=flutter)](https://flutter.dev)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platforms-Android%20%7C%20iOS-orange)]()
+#  GYMRVT – AI-Powered Gym Companion
 
 GYMRVT is a free, open-source mobile fitness app that turns your phone into a **real-time training partner**.  
 No wearables. No subscriptions. Just computer vision, AI insights, and your own determination.  
-
-<p align="center">
-  <img src="assets/tflite_model/images/adaptive_fg_gymrvt_blue.svg" width="200" alt="GYMRVT Logo"/>
-</p>
 
 ---
 
@@ -71,14 +62,6 @@ No wearables. No subscriptions. Just computer vision, AI insights, and your own 
 
 ---
 
-##  Screenshots
-
-<p align="center">
-  <img src="docs/screenshots/home.png" width="200" />
-  <img src="docs/screenshots/workout.png" width="200" />
-  <img src="docs/screenshots/camera.png" width="200" />
-  <img src="docs/screenshots/profile.png" width="200" />
-</p>
 
 ---
 
