@@ -1,11 +1,12 @@
-import 'dart:typed_data';
-import 'dart:ui' as ui;
+// lib/pages/photo_advisor_page.dart
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:google_mlkit_pose_detection/google_mlkit_pose_detection.dart';
 
-import '../services/muscle_advisor.dart';
 import '../widgets/pose_painter.dart';
+import '../services/muscle_advisor.dart';
+import '../services/muscle_advisor_api.dart';
 
 class PhotoAdvisorPage extends StatefulWidget {
   const PhotoAdvisorPage({super.key});
@@ -15,70 +16,119 @@ class PhotoAdvisorPage extends StatefulWidget {
 }
 
 class _PhotoAdvisorPageState extends State<PhotoAdvisorPage> {
-  Uint8List? _bytes;
-  Size _imageSize = Size.zero; // original pixel size
+  File? _photo;
+  Size _imageSize = const Size(720, 1280);
   List<Pose> _poses = const [];
-  MuscleAdvice? _advice;
-  bool _flipX = false;
+  PoseDetector? _detector;
+  bool _busy = false;
+  MuscleAdvice? _lastAdvice;
 
-  final _picker = ImagePicker();
-  final PoseDetector _detector = PoseDetector(
-    options: PoseDetectorOptions(
-      mode: PoseDetectionMode.single,
-      model: PoseDetectionModel.base,
-    ),
-  );
+  @override
+  void initState() {
+    super.initState();
+    _detector = PoseDetector(options: PoseDetectorOptions());
+  }
 
   @override
   void dispose() {
-    _detector.close();
+    _detector?.close();
     super.dispose();
   }
 
-  Future<void> _pick() async {
-    final picked = await _picker.pickImage(source: ImageSource.gallery);
+  Future<void> _pickPhoto() async {
+    final picked = await ImagePicker().pickImage(source: ImageSource.gallery);
     if (picked == null) return;
 
-    final bytes = await picked.readAsBytes();
-
-    // Determine original pixel size of the image buffer.
-    final codec = await ui.instantiateImageCodec(bytes);
-    final fi = await codec.getNextFrame();
-    final imgW = fi.image.width.toDouble();
-    final imgH = fi.image.height.toDouble();
-
-    // Run pose on the file path.
-    final input = InputImage.fromFilePath(picked.path);
-    final poses = await _detector.processImage(input);
-
-    // If analyze() uses named params, pass {pose: ...}
-    final MuscleAdvice? advice =
-        poses.isNotEmpty ? await Future.value(MuscleAdvisor.analyze(pose: poses.first)) : null;
-
-    if (!mounted) return;
+    final f = File(picked.path);
     setState(() {
-      _bytes = bytes;
-      _imageSize = Size(imgW, imgH);
-      _poses = poses;
-      _advice = advice;
+      _photo = f;
+      _poses = const [];
+      _lastAdvice = null;
+      _busy = true;
     });
+
+    try {
+      // Detect pose (for overlay + local fallback)
+      final inputImg = InputImage.fromFilePath(f.path);
+      final poses = await _detector!.processImage(inputImg);
+      setState(() => _poses = poses);
+
+      // Ask AI (or fall back locally if API_URL is empty/unavailable)
+      final advice = await MuscleAdvisorApi.tryAnalyzeOrFallback(
+        imageFile: f,
+        poseForFallback: poses.isNotEmpty ? poses.first : null,
+      );
+
+      if (!mounted) return;
+      setState(() => _lastAdvice = advice);
+
+      // Also show as a bottom sheet once (nice UX)
+      _showAdvice(advice);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Analysis failed: $e')),
+      );
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 
-  /// Rectangle where the image is actually rendered with BoxFit.contain.
-  Rect _containedRect(Size canvas, Size source) {
-    if (canvas.isEmpty || source.isEmpty) return Rect.zero;
-    final sx = canvas.width / source.width;
-    final sy = canvas.height / source.height;
-    final scale = sx < sy ? sx : sy;
-    final w = source.width * scale;
-    final h = source.height * scale;
-    final dx = (canvas.width - w) / 2;
-    final dy = (canvas.height - h) / 2;
-    return Rect.fromLTWH(dx, dy, w, h);
+  void _showAdvice(MuscleAdvice advice) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: Theme.of(context).cardColor,
+      builder: (ctx) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          child: _adviceContent(advice, compact: true),
+        );
+      },
+    );
+  }
+
+  Widget _adviceContent(MuscleAdvice advice, {bool compact = false}) {
+    return Column(
+      mainAxisSize: compact ? MainAxisSize.min : MainAxisSize.max,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Muscle Advisor',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
+        const SizedBox(height: 8),
+        Text(advice.summary),
+        const SizedBox(height: 12),
+        if (advice.focus.isNotEmpty) ...[
+          const Text('Needs more work',
+              style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: advice.focus.map((m) => Chip(label: Text(m))).toList(),
+          ),
+          const SizedBox(height: 12),
+        ],
+        if (advice.caution.isNotEmpty) ...[
+          const Text('Caution',
+              style: TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          ...advice.caution.map((c) => Row(
+                children: [
+                  const Icon(Icons.warning_amber_rounded, size: 16),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(c)),
+                ],
+              )),
+        ],
+      ],
+    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Scaffold(
       backgroundColor: Colors.transparent,
       appBar: AppBar(
@@ -86,112 +136,137 @@ class _PhotoAdvisorPageState extends State<PhotoAdvisorPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          if (_bytes != null)
-            IconButton(
-              tooltip: _flipX ? 'Unflip overlay' : 'Flip overlay',
-              onPressed: () => setState(() => _flipX = !_flipX),
-              icon: const Icon(Icons.flip),
-            ),
+          IconButton(
+            tooltip: 'Pick photo',
+            onPressed: _busy ? null : _pickPhoto,
+            icon: const Icon(Icons.image_outlined),
+          ),
         ],
       ),
-      body: ListView(
+      body: Padding(
         padding: const EdgeInsets.all(16),
-        children: [
-          AspectRatio(
-            aspectRatio: 3 / 4,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final canvasSize =
-                    Size(constraints.maxWidth, constraints.maxHeight);
-                final drawRect = _containedRect(canvasSize, _imageSize);
-
-                return Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    // Photo
-                    Container(
-                      color: const Color(0xFF1F1C23),
-                      child: _bytes == null
-                          ? const Center(child: Text('Choose a photo'))
-                          : FittedBox(
-                              fit: BoxFit.contain,
-                              child: Image.memory(_bytes!),
-                            ),
-                    ),
-                    // Overlay
-                    if (_bytes != null && _poses.isNotEmpty && !drawRect.isEmpty)
-                      CustomPaint(
-                        painter: PosePainter(
-                          poses: _poses,
-                          imageSize: _imageSize,
-                          drawRect: drawRect,
-                          flipX: _flipX,
-                        ),
-                        size: Size.infinite,
-                      ),
-                  ],
-                );
-              },
+        child: Column(
+          children: [
+            // Hero/Title
+            Row(
+              children: [
+                Icon(Icons.insights, color: theme.colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  'Get smart advice from your photo',
+                  style: theme.textTheme.titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 16),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Muscle Advisor',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 8),
-                  Text(
-                    _advice?.summary ??
-                        'Pick a clear, well-lit photo (front or back) Ai-advisor will give advice on certain groups.',
-                  ),
-                  if (_advice?.focus.isNotEmpty == true) ...[
-                    const SizedBox(height: 8),
-                    const Text('Focus',
-                        style: TextStyle(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: _advice!.focus
-                          .map((m) => Chip(label: Text(m)))
-                          .toList(),
-                    ),
-                  ],
-                  if (_advice?.caution.isNotEmpty == true) ...[
-                    const SizedBox(height: 8),
-                    const Text('Caution',
-                        style: TextStyle(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 6),
-                    ..._advice!.caution.map(
-                      (c) => Row(
-                        children: [
-                          const Icon(Icons.warning_amber_rounded, size: 16),
-                          const SizedBox(width: 6),
-                          Expanded(child: Text(c)),
-                        ],
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: ElevatedButton.icon(
-                      onPressed: _pick,
-                      icon: const Icon(Icons.image_outlined),
-                      label: const Text('Choose Photo'),
+            const SizedBox(height: 12),
+
+            // Preview card
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        theme.colorScheme.surface.withOpacity(0.3),
+                        theme.colorScheme.surfaceVariant.withOpacity(0.25),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
                   ),
-                ],
+                  child: _busy
+                      ? const Center(child: CircularProgressIndicator())
+                      : (_photo == null
+                          ? _emptyState(context)
+                          : LayoutBuilder(
+                              builder: (ctx, c) {
+                                final w = c.maxWidth;
+                                final h = c.maxHeight;
+                                _imageSize = Size(w, h); // match painted area
+                                return Stack(
+                                  fit: StackFit.expand,
+                                  children: [
+                                    Image.file(_photo!, fit: BoxFit.cover),
+                                    if (_poses.isNotEmpty)
+                                      CustomPaint(
+                                        painter: PosePainter(
+                                          poses: _poses,
+                                          imageSize: _imageSize,
+                                          repCount: 0,
+                                        ),
+                                      ),
+                                    if (_lastAdvice != null)
+                                      Positioned(
+                                        left: 12,
+                                        right: 12,
+                                        bottom: 12,
+                                        child: DecoratedBox(
+                                          decoration: BoxDecoration(
+                                            color: Colors.black54,
+                                            borderRadius:
+                                                BorderRadius.circular(12),
+                                          ),
+                                          child: Padding(
+                                            padding: const EdgeInsets.all(12),
+                                            child: _adviceContent(
+                                              _lastAdvice!,
+                                              compact: true,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                );
+                              },
+                            )),
+                ),
               ),
             ),
+
+            const SizedBox(height: 12),
+
+            // Primary CTA
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _busy ? null : _pickPhoto,
+                icon: const Icon(Icons.image),
+                label: Text(_photo == null ? 'Choose Photo' : 'Choose Another Photo'),
+                style: ElevatedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _emptyState(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.photo_library_outlined,
+              size: 56, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(height: 10),
+          const Text('Add a photo to analyze your form\nand training balance.',
+              textAlign: TextAlign.center),
+          const SizedBox(height: 12),
+          ElevatedButton.icon(
+            onPressed: _pickPhoto,
+            icon: const Icon(Icons.image),
+            label: const Text('Choose Photo'),
           ),
         ],
       ),
     );
   }
 }
+
