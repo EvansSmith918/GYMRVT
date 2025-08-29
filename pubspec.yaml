@@ -1,12 +1,11 @@
-# pubspec.yaml  (replace the whole file with this)
 name: gymrvt
-description: "A new Flutter project."
+description: "GYMRVT — AI-powered, on-device workout tracker (pose, reps, tempo)."
 publish_to: 'none'
 
-version: 1.0.0+1
+# Bump the build number after every Play upload
+version: 1.0.0+2
 
 environment:
-  # Broaden the Dart SDK range so pub can resolve packages on current Flutter
   sdk: ">=3.3.0 <4.0.0"
 
 dependencies:
@@ -26,7 +25,7 @@ dependencies:
   cross_file: ^0.3.4+2
   share_plus: ^10.0.2
 
-  # ML Kit (updated)
+  # ML Kit
   google_mlkit_pose_detection: ^0.10.0
 
   # Health / notifications
@@ -40,7 +39,7 @@ dependencies:
   fl_chart: ^0.64.0
   intl: ^0.19.0
   flutter_colorpicker: ^1.0.3
-  http: ^1.2.2   # <-- for remote AI/API calls
+  http: ^1.2.2   # remote AI/API calls
 
 dev_dependencies:
   flutter_test:
