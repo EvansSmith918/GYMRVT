@@ -1,17 +1,17 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
+
 import 'pages/home_page.dart';
 import 'pages/workout_page.dart';
-import 'pages/photo_advisor_page.dart'; // <-- use photo upload analysis page
-import 'pages/profile_root_page.dart'; // <-- root for profile flow
+import 'pages/photo_advisor_page.dart'; // photo upload analysis page
+import 'pages/profile_root_page.dart';   // root for profile flow
 import 'widgets/app_background.dart';
 
-// NEW: init the nutrition database before runApp
 import 'package:gymrvt/services/nutrition_store.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await NutritionStore().init(); // <-- creates tables & default targets
+  await NutritionStore().init(); // creates tables & default targets
   runApp(const MyApp());
 }
 
@@ -26,10 +26,15 @@ class MyApp extends StatelessWidget {
       theme: ThemeData.dark(),
       // Clamp extreme text scaling and ensure SafeArea for every page
       builder: (context, child) {
-        final clamped = MediaQuery.of(context).textScaler.clamp(maxScaleFactor: 1.2);
+        final clamped =
+            MediaQuery.of(context).textScaler.clamp(maxScaleFactor: 1.2);
         return MediaQuery(
           data: MediaQuery.of(context).copyWith(textScaler: clamped),
-          child: SafeArea(top: true, bottom: true, child: child!),
+          child: SafeArea(
+            top: true,
+            bottom: true,
+            child: child ?? const SizedBox(),
+          ),
         );
       },
       home: const MainPage(),
@@ -51,8 +56,8 @@ class _MainPageState extends State<MainPage> {
   final List<Widget> _pages = const [
     HomePage(),
     WorkoutPage(),
-    PhotoAdvisorPage(), // <-- swapped in here
-    ProfileRoot(),      // <-- instead of ProfilePage
+    PhotoAdvisorPage(),
+    ProfileRoot(),
   ];
 
   @override
@@ -79,7 +84,8 @@ class _MainPageState extends State<MainPage> {
         type: BottomNavigationBarType.fixed,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.fitness_center), label: 'Workout'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.fitness_center), label: 'Workout'),
           BottomNavigationBarItem(icon: Icon(Icons.camera_alt), label: 'Camera'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
         ],

@@ -14,7 +14,6 @@ dependencies:
   cupertino_icons: ^1.0.8
 
   # Nutrition helper deps
-  sqflite: ^2.3.3+1
   path: ^1.9.0
   mobile_scanner: ^7.0.1
 
@@ -40,6 +39,7 @@ dependencies:
   intl: ^0.19.0
   flutter_colorpicker: ^1.0.3
   http: ^1.2.2   # remote AI/API calls
+  sqflite_android: ^2.4.1
 
 dev_dependencies:
   flutter_test:
