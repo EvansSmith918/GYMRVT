@@ -73,7 +73,8 @@ No wearables. No subscriptions. Just computer vision, AI insights, and your own 
 
 ---
 
-## Coming to Play Store and iOS Soon
+## Avaliable on PlayStore
+Coming to iOS Soon
 ---
 
 ##  Installation
