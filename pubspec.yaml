@@ -3,7 +3,7 @@ description: "GYMRVT — AI-powered, on-device workout tracker (pose, reps, temp
 publish_to: 'none'
 
 # Bump the build number after every Play upload
-version: 1.0.0+8
+version: 1.0.0+9
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
