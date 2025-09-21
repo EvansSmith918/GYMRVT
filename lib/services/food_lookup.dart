@@ -14,7 +14,7 @@ class FoodLookup {
     if (p == null) return null;
     final n = p['nutriments'] ?? {};
 
-    double _num(dynamic x) {
+    double parseNum(dynamic x) {
       if (x == null) return 0;
       if (x is num) return x.toDouble();
       if (x is String) {
@@ -28,11 +28,11 @@ class FoodLookup {
       brand: (p['brands'] ?? '').toString(),
       barcode: barcode,
       servingSizeGram:
-          _num(n['serving_size']) == 0 ? 100 : _num(n['serving_size']),
-      cals: _num(n['energy-kcal_serving'] ?? n['energy-kcal_100g']),
-      protein: _num(n['proteins_serving'] ?? n['proteins_100g']),
-      carbs: _num(n['carbohydrates_serving'] ?? n['carbohydrates_100g']),
-      fat: _num(n['fat_serving'] ?? n['fat_100g']),
+          parseNum(n['serving_size']) == 0 ? 100 : parseNum(n['serving_size']),
+      cals: parseNum(n['energy-kcal_serving'] ?? n['energy-kcal_100g']),
+      protein: parseNum(n['proteins_serving'] ?? n['proteins_100g']),
+      carbs: parseNum(n['carbohydrates_serving'] ?? n['carbohydrates_100g']),
+      fat: parseNum(n['fat_serving'] ?? n['fat_100g']),
     );
   }
 }

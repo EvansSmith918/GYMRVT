@@ -36,7 +36,7 @@ class NutritionService {
       return "Add a 25–35 g protein snack to stay on track.";
     }
     if (dCals > 400) {
-      return "About ${dCals} kcal left—plan a balanced meal (protein + carbs + veg).";
+      return "About $dCals kcal left—plan a balanced meal (protein + carbs + veg).";
     }
     if (dCals < -200) {
       return "Over calories today—go lighter at dinner and bump water/fiber.";
